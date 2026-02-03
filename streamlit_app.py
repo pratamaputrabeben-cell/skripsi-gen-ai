@@ -1,10 +1,10 @@
 import streamlit as st
-import requests
 import google.generativeai as genai
 from docx import Document
 from io import BytesIO
+from datetime import datetime
 
-# --- 1. KONEKSI KE API ---
+# --- 1. KONFIGURASI API ---
 try:
     api_key = st.secrets["GEMINI_API_KEY"]
     genai.configure(api_key=api_key)
@@ -12,68 +12,75 @@ except:
     st.error("API Key belum terpasang di Secrets.")
     st.stop()
 
-def get_working_model():
-    try:
-        for m in genai.list_models():
-            if 'generateContent' in m.supported_generation_methods:
-                return m.name
-    except: pass
-    return "models/gemini-1.5-flash"
+model = genai.GenerativeModel('gemini-1.5-flash')
 
-model = genai.GenerativeModel(get_working_model())
-
-# --- 2. FUNGSI DOWNLOAD ---
-def create_docx(judul, bab, konten):
-    doc = Document()
-    doc.add_heading(f"{bab}", 0)
-    doc.add_heading(f"Judul: {judul}", level=1)
-    doc.add_paragraph(konten)
-    bio = BytesIO()
-    doc.save(bio)
-    return bio.getvalue()
+# --- 2. RUMUS RAHASIA LISENSI ---
+def generate_license_logic(nama):
+    hari_ini = datetime.now().strftime("%d%m") # Format: TanggalBulan (Contoh: 0402)
+    nama_clean = nama.split(' ')[0].upper()
+    # Rumus: PRO-[NAMA]-0402-[KODE_UNIK]
+    return f"PRO-{nama_clean}-{hari_ini}-SKR"
 
 # --- 3. TAMPILAN WEBSITE ---
-st.set_page_config(page_title="SkripsiGen Pro - Auto Reference", layout="wide")
-st.title("🎓 SkripsiGen Pro v3.8")
+st.set_page_config(page_title="SkripsiGen Pro - Vendor Edition", layout="wide")
 
+# --- FITUR ADMIN (HANYA UNTUK KAMU) ---
+with st.expander("🛠️ Admin Panel (Khusus Owner)"):
+    kunci_admin = st.text_input("Masukkan Kunci Admin:", type="password")
+    if kunci_admin == "BEBEN-BOSS": # GANTI INI DENGAN PASSWORD ADMINMU
+        st.subheader("Generator Kode Lisensi")
+        nama_pembeli = st.text_input("Input Nama Pembeli:")
+        if st.button("Generate Kode"):
+            hasil_kode = generate_license_logic(nama_pembeli)
+            st.code(hasil_kode, language="text")
+            st.success(f"Berikan kode di atas kepada {nama_pembeli}")
+    else:
+        st.write("Silakan masukkan kunci admin untuk generate lisensi.")
+
+st.title("🎓 SkripsiGen Pro v5.0")
+
+# --- 4. TAMPILAN UNTUK PEMBELI ---
 with st.sidebar:
-    st.header("⚙️ Pengaturan")
-    topik = st.text_input("Judul Skripsi:", placeholder="Contoh: Strategi Pemasaran UMKM...")
-    metode = st.radio("Metode Penelitian:", ["Kuantitatif", "Kualitatif", "R&D"])
+    st.header("👤 Identitas Pengguna")
+    nama_user = st.text_input("Nama Lengkap:", placeholder="Contoh: Budi Santoso")
+    
+    st.divider()
+    st.header("⚙️ Pengaturan Bab")
+    topik = st.text_input("Judul Skripsi:")
     bab_pilihan = st.selectbox("Pilih Bab:", ["Bab 1", "Bab 2", "Bab 3", "Bab 4", "Bab 5"])
     
     st.divider()
-    st.write("📚 **Format Sitasi:** APA Style 7th Ed.")
-    st_auto_ref = st.checkbox("Sertakan Daftar Pustaka", value=True)
+    st.write("🔓 **Aktivasi Download**")
+    wa_number = "6283173826717"
+    pesan_wa = f"Halo Gan, saya {nama_user}. Saya mau beli Kode Lisensi."
+    st.link_button("📲 Beli Lisensi via WA", f"https://wa.me/{wa_number}?text={pesan_wa.replace(' ', '%20')}")
+    
+    user_license = st.text_input("Masukkan Kode Lisensi:", type="password")
 
-# --- 4. EKSEKUSI ---
-if st.button(f"Generate {bab_pilihan} & Referensi ✨"):
-    if topik:
-        with st.spinner(f"Menyusun {bab_pilihan} dan memvalidasi daftar pustaka..."):
-            
-            prompt = f"""
-            Tugas: Buatkan draf {bab_pilihan} untuk skripsi berjudul '{topik}' dengan metode {metode}.
-            
-            Aturan Akademik:
-            1. Gunakan bahasa Indonesia formal (EYD).
-            2. Berikan narasi yang dalam dan ilmiah.
-            3. Sertakan kutipan (Sitasi) dalam teks (Contoh: Sugiyono, 2019).
-            4. {'WAJIB: Buatkan DAFTAR PUSTAKA di akhir teks yang berisi semua referensi yang disitasi di atas dengan format APA Style 7th Edition.' if st_auto_ref else ''}
-            5. Pastikan referensi relevan dengan topik dan metode {metode}.
-            """
-            
+# --- 5. LOGIKA GENERATE ---
+if st.button(f"Generate Draf {bab_pilihan} ✨"):
+    if topik and nama_user:
+        with st.spinner("Menyusun draf..."):
             try:
-                response = model.generate_content(prompt)
+                response = model.generate_content(f"Buatkan draf {bab_pilihan} skripsi tentang '{topik}'. Bahasa formal Indonesia.")
                 hasil_teks = response.text
                 
-                st.markdown(f"### ✨ Hasil Draf {bab_pilihan}")
+                st.markdown(f"### 📄 Preview untuk {nama_user}")
                 st.write(hasil_teks)
                 
-                file_word = create_docx(topik, bab_pilihan, hasil_teks)
-                st.download_button(f"📥 Download {bab_pilihan} + Daftar Pustaka", 
-                                   data=file_word, 
-                                   file_name=f"{bab_pilihan.replace(' ', '_')}_Lengkap.docx")
+                # VALIDASI LISENSI
+                kode_seharusnya = generate_license_logic(nama_user)
+                if user_license == kode_seharusnya: 
+                    st.success(f"✅ Lisensi Aktif!")
+                    doc = Document()
+                    doc.add_heading(f"{bab_pilihan}: {topik}", 0)
+                    doc.add_paragraph(hasil_teks)
+                    bio = BytesIO()
+                    doc.save(bio)
+                    st.download_button("📥 Download File Word (.docx)", data=bio.getvalue(), file_name=f"Draf_{nama_user}.docx")
+                else:
+                    st.warning("⚠️ Kode Lisensi salah atau tidak sesuai nama. Silakan beli ke admin.")
             except Exception as e:
-                st.error(f"Terjadi kesalahan: {e}")
+                st.error(f"Error: {e}")
     else:
-        st.warning("Isi judul skripsi dulu!")
+        st.warning("Isi Nama dan Judul dulu!")
