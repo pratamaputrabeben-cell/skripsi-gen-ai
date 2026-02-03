@@ -12,7 +12,17 @@ except:
     st.error("API Key belum terpasang di Secrets.")
     st.stop()
 
-model = genai.GenerativeModel('gemini-1.5-flash')
+# Fungsi untuk memilih model secara otomatis
+def get_working_model():
+    try:
+        for m in genai.list_models():
+            if 'generateContent' in m.supported_generation_methods:
+                return m.name
+    except:
+        pass
+    return "models/gemini-pro"
+
+model = genai.GenerativeModel(get_working_model())
 
 # --- 2. FUNGSI PENDUKUNG ---
 def create_docx(judul, bab, konten):
@@ -43,7 +53,6 @@ if st.button(f"Generate & Bersihkan {bab_pilihan} ✨"):
     if topik:
         with st.spinner(f"Sedang menyusun dan melakukan parafrase otomatis pada {bab_pilihan}..."):
             
-            # Prompt yang lebih kompleks agar AI menulis sekaligus memparafrase dirinya sendiri
             prompt = f"""
             Tugas: Buatkan draf {bab_pilihan} untuk skripsi berjudul '{topik}' dengan metode {metode}.
             
@@ -59,17 +68,16 @@ if st.button(f"Generate & Bersihkan {bab_pilihan} ✨"):
                 response = model.generate_content(prompt)
                 hasil_teks = response.text
                 
-                # Tampilkan hasil
                 st.markdown(f"### ✨ Hasil Draf {bab_pilihan} (Versi Bersih)")
                 st.success("✅ Teks telah diproses dengan fitur Anti-Plagiat Otomatis.")
-                
                 st.write(hasil_teks)
                 
-                # Tombol Download
                 file_word = create_docx(topik, bab_pilihan, hasil_teks)
                 st.download_button(f"📥 Download {bab_pilihan} (.docx)", 
                                    data=file_word, 
                                    file_name=f"Clean_{bab_pilihan.replace(' ', '_')}.docx")
                 
             except Exception as e:
-                st.error(f"Terjadi kesalahan: {
+                st.error(f"Terjadi kesalahan: {e}")
+    else:
+        st.warning("Silakan isi judul skripsi dulu!")
