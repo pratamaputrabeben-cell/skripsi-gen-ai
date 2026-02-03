@@ -6,7 +6,7 @@ from io import BytesIO
 
 # --- KONFIGURASI API ---
 genai.configure(api_key="AIzaSyAFv7QLp9t7luNhvjXTV_RB4Zm7hwm5CN0")
-model = genai.GenerativeModel('gemini-1.5-flash')
+model = genai.GenerativeModel('gemini-pro')
 
 # --- FUNGSI PENDUKUNG ---
 def search_real_papers(query):
