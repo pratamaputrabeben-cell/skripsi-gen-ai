@@ -10,7 +10,7 @@ try:
     api_key = st.secrets["GEMINI_API_KEY"]
     genai.configure(api_key=api_key)
     # Langsung pakai model spesifik (Tanpa fungsi get_active_model yang error tadi)
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    model = genai.GenerativeModel('models/gemini-1.5-pro-latest')
 except Exception as e:
     st.error(f"Masalah pada API Key atau Konfigurasi: {e}")
     st.stop()
