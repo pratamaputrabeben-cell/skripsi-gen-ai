@@ -1,0 +1,1 @@
+genai.configure(api_key="AIzaSyAFv7QLp9t7luNhvjXTV_RB4Zm7hwm5CN0")
