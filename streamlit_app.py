@@ -4,83 +4,79 @@ import google.generativeai as genai
 from docx import Document
 from io import BytesIO
 
-# --- 1. KONEKSI KE API (AMBIL DARI SECRETS) ---
+# --- 1. KONEKSI KE API ---
 try:
     api_key = st.secrets["GEMINI_API_KEY"]
     genai.configure(api_key=api_key)
-except Exception as e:
-    st.error("Waduh! API Key belum dipasang di Secrets Streamlit. Cek menu Settings > Secrets.")
+except:
+    st.error("API Key belum terpasang di Secrets.")
     st.stop()
 
-# --- 2. FUNGSI MENCARI MODEL YANG AKTIF (ANTI-404) ---
 def get_working_model():
     try:
-        # Mencari model apa saja yang diizinkan untuk API Key Anda
         for m in genai.list_models():
             if 'generateContent' in m.supported_generation_methods:
                 return m.name
-    except:
-        pass
-    return "models/gemini-pro" # Pilihan terakhir jika gagal scan
+    except: pass
+    return "models/gemini-pro"
 
-# --- 3. FUNGSI PENDUKUNG ---
-def search_real_papers(query):
-    url = f"https://api.semanticscholar.org/graph/v1/paper/search?query={query}&limit=3&fields=title,authors,year,abstract,url"
-    try:
-        response = requests.get(url, timeout=5)
-        return response.json().get('data', [])
-    except:
-        return []
+model = genai.GenerativeModel(get_working_model())
 
-def create_docx(judul, konten):
+# --- 2. FUNGSI PENDUKUNG ---
+def create_docx(judul, bab, konten):
     doc = Document()
-    doc.add_heading(judul, 0)
+    doc.add_heading(f"{bab}: {judul}", 0)
     doc.add_paragraph(konten)
     bio = BytesIO()
     doc.save(bio)
     return bio.getvalue()
 
-# --- 4. TAMPILAN WEBSITE ---
-st.set_page_config(page_title="Penyusun Skripsi Otomatis", layout="wide")
-st.title("🎓 SkripsiGen Pro")
+# --- 3. TAMPILAN WEBSITE ---
+st.set_page_config(page_title="SkripsiGen Pro - Full Version", layout="wide")
+st.title("🎓 SkripsiGen Pro v2.0")
+st.subheader("Penyusun Draf Skripsi Lengkap (Bab 1 - 5)")
 
-topik = st.text_input("Masukkan Topik/Judul Skripsi:", placeholder="Contoh: Pengaruh Media Sosial pada Remaja")
-bahasa = st.selectbox("Pilih Bahasa:", ["Indonesia", "English"])
+with st.sidebar:
+    st.header("Konfigurasi")
+    topik = st.text_input("Judul Skripsi:", placeholder="Masukkan judul lengkap...")
+    bab_pilihan = st.selectbox("Pilih Bab yang Ingin Dibuat:", 
+                              ["Bab 1: Pendahuluan", 
+                               "Bab 2: Tinjauan Pustaka", 
+                               "Bab 3: Metodologi Penelitian", 
+                               "Bab 4: Hasil dan Pembahasan", 
+                               "Bab 5: Penutup"])
+    bahasa = st.selectbox("Bahasa:", ["Indonesia", "English"])
 
-if st.button("Generate Draf Bab 1 ✨"):
+# --- 4. LOGIKA PROMPT BERDASARKAN BAB ---
+instruksi_bab = {
+    "Bab 1: Pendahuluan": "Buatkan Latar Belakang, Rumusan Masalah, Tujuan, dan Manfaat Penelitian.",
+    "Bab 2: Tinjauan Pustaka": "Buatkan landasan teori yang kuat, penelitian terdahulu, dan kerangka berpikir.",
+    "Bab 3: Metodologi Penelitian": "Buatkan desain penelitian, populasi/sampel, teknik pengumpulan data, dan analisis data.",
+    "Bab 4: Hasil dan Pembahasan": "Buatkan draf hasil penelitian (gunakan data dummy/contoh) dan analisis mendalam.",
+    "Bab 5: Penutup": "Buatkan Kesimpulan yang menjawab rumusan masalah dan Saran untuk penelitian selanjutnya."
+}
+
+if st.button(f"Generate {bab_pilihan} ✨"):
     if topik:
-        with st.spinner("Sedang mencari model dan menyusun draf..."):
-            # Cari model otomatis
-            model_name = get_working_model()
-            model = genai.GenerativeModel(model_name)
-            
-            # Cari referensi
-            papers = search_real_papers(topik)
-            context = ""
-            if papers:
-                for p in papers:
-                    context += f"Judul: {p['title']}\nAbstrak: {p['abstract']}\n\n"
-            
-            prompt = f"Buatkan Bab 1 Skripsi formal dalam {bahasa} dengan judul '{topik}'. Gunakan data ini jika ada:\n{context}. Sertakan Latar Belakang, Rumusan Masalah, dan Daftar Pustaka."
-            
+        with st.spinner(f"Sedang menyusun {bab_pilihan}..."):
+            prompt = f"""
+            Anda adalah asisten dosen ahli. Buatkan draf {bab_pilihan} untuk skripsi berjudul '{topik}'.
+            Gunakan bahasa Indonesia yang sangat formal dan akademik.
+            Instruksi khusus: {instruksi_bab[bab_pilihan]}
+            Sertakan sitasi standar APA jika memungkinkan.
+            """
             try:
                 response = model.generate_content(prompt)
                 hasil_teks = response.text
                 
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.subheader(f"📝 Draf Bab 1")
-                    st.write(hasil_teks)
-                    file_word = create_docx(topik, hasil_teks)
-                    st.download_button("📥 Download File Word", data=file_word, file_name=f"Draf_Skripsi.docx")
-                with col2:
-                    st.subheader("📚 Referensi Jurnal")
-                    if papers:
-                        for p in papers:
-                            st.info(f"**{p['title']}**\n[Link Jurnal]({p['url']})")
-                    else:
-                        st.warning("Jurnal spesifik tidak ditemukan, menggunakan basis data AI.")
+                st.markdown(f"### Hasil {bab_pilihan}")
+                st.write(hasil_teks)
+                
+                file_word = create_docx(topik, bab_pilihan, hasil_teks)
+                st.download_button(f"📥 Download {bab_pilihan} (Word)", 
+                                   data=file_word, 
+                                   file_name=f"{bab_pilihan.replace(':', '')}.docx")
             except Exception as e:
-                st.error(f"Gagal generate: {e}")
+                st.error(f"Gagal: {e}")
     else:
-        st.warning("Silakan masukkan judul terlebih dahulu!")
+        st.warning("Silakan isi judul skripsi di menu samping (sidebar)!")
