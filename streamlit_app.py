@@ -4,18 +4,26 @@ import google.generativeai as genai
 from docx import Document
 from io import BytesIO
 
-# --- KONFIGURASI API ---
-genai.configure(api_key="AIzaSyAFv7QLp9t7luNhvjXTV_RB4Zm7hwm5CN0")
+# --- KONFIGURASI API AMAN ---
+# Sistem akan otomatis mengambil kunci dari menu Secrets tadi
+try:
+    api_key = st.secrets["GEMINI_API_KEY"]
+    genai.configure(api_key=api_key)
+except:
+    st.error("Waduh! API Key belum dipasang di menu Secrets Streamlit.")
+    st.stop()
 
-# Fungsi untuk mencari model yang aktif secara otomatis
+# Fungsi mencari model aktif
 def get_active_model():
-    for m in genai.list_models():
-        if 'generateContent' in m.supported_generation_methods:
-            return m.name
-    return 'gemini-pro' # fallback
+    try:
+        for m in genai.list_models():
+            if 'generateContent' in m.supported_generation_methods:
+                return m.name
+    except:
+        pass
+    return 'gemini-1.5-flash'
 
-active_model_name = get_active_model()
-model = genai.GenerativeModel(active_model_name)
+model = genai.GenerativeModel(get_active_model())
 
 # --- FUNGSI PENDUKUNG ---
 def search_real_papers(query):
@@ -37,7 +45,6 @@ def create_docx(judul, konten):
 # --- TAMPILAN WEBSITE ---
 st.set_page_config(page_title="Penyusun Skripsi Otomatis", layout="wide")
 st.title("🎓 SkripsiGen Pro")
-st.caption(f"Menggunakan Model: {active_model_name}")
 
 topik = st.text_input("Masukkan Topik/Judul Skripsi:", placeholder="Contoh: Dampak AI pada UMKM")
 bahasa = st.selectbox("Pilih Bahasa:", ["Indonesia", "English"])
@@ -46,15 +53,12 @@ if st.button("Generate Draf Bab 1 ✨"):
     if topik:
         with st.spinner("Sedang menyusun draf..."):
             papers = search_real_papers(topik)
-            
+            context = ""
             if papers:
-                context = "Gunakan data riil dari jurnal berikut:\n"
                 for p in papers:
                     context += f"Judul: {p['title']}\nAbstrak: {p['abstract']}\nURL: {p['url']}\n\n"
-            else:
-                context = "Gunakan pengetahuan akademik umum yang relevan."
-
-            prompt = f"Buatkan Bab 1 Skripsi formal dalam {bahasa} dengan judul '{topik}'. {context} Sertakan Latar Belakang, Rumusan Masalah, dan Daftar Pustaka."
+            
+            prompt = f"Buatkan Bab 1 Skripsi formal dalam {bahasa} dengan judul '{topik}'. Gunakan data riil jika ada:\n{context}. Sertakan Latar Belakang dan Daftar Pustaka."
             
             try:
                 response = model.generate_content(prompt)
@@ -72,8 +76,6 @@ if st.button("Generate Draf Bab 1 ✨"):
                         for p in papers:
                             st.info(f"**{p['title']}** ({p['year']})\n[Link Jurnal]({p['url']})")
                     else:
-                        st.warning("Jurnal spesifik tidak ditemukan, draf dibuat berbasis pengetahuan AI.")
+                        st.warning("Jurnal tidak ditemukan, menggunakan pengetahuan AI.")
             except Exception as e:
                 st.error(f"Kesalahan: {e}")
-    else:
-        st.warning("Masukkan judul!")
