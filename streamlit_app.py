@@ -28,8 +28,6 @@ def inisialisasi_ai():
 # --- 2. FUNGSI RAPIKAN WORD (STANDAR SKRIPSI 4-3-3-3) ---
 def buat_dokumen_rapi(judul_bab, isi_teks):
     doc = Document()
-    
-    # Pengaturan Margin (4333)
     sections = doc.sections
     for section in sections:
         section.top_margin = Cm(3)
@@ -37,12 +35,10 @@ def buat_dokumen_rapi(judul_bab, isi_teks):
         section.left_margin = Cm(4)
         section.right_margin = Cm(3)
 
-    # Setting Font Global
     style = doc.styles['Normal']
     style.font.name = 'Times New Roman'
     style.font.size = Pt(12)
     
-    # Judul Bab (Center, Bold, Size 14)
     head = doc.add_heading(judul_bab, 0)
     head.alignment = WD_ALIGN_PARAGRAPH.CENTER
     for run in head.runs:
@@ -60,7 +56,6 @@ def buat_dokumen_rapi(judul_bab, isi_teks):
             p_format.line_spacing = 1.5
             p_format.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
             
-            # Logika Penomoran & Indentasi
             if t[0].isdigit() and "." in t[:5]:
                 run = p.add_run(t)
                 run.bold = True
@@ -76,12 +71,11 @@ def buat_dokumen_rapi(judul_bab, isi_teks):
     return bio.getvalue()
 
 # --- 3. UI SETUP ---
-st.set_page_config(page_title="SkripsiGen Pro v8.47", layout="wide")
+st.set_page_config(page_title="SkripsiGen Pro v8.48", layout="wide")
 
 with st.sidebar:
     st.header("🛡️ Pusat Kalibrasi")
-    st.success("✅ Margin 4-3-3-3: ACTIVE")
-    st.success("✅ Anti-Plagiarism: ACTIVE")
+    st.success("✅ Clean Code System")
     
     nama_user = st.text_input("👤 Nama Mahasiswa:", value=st.session_state['user_data']['nama'])
     st.session_state['user_data']['nama'] = nama_user
@@ -95,4 +89,69 @@ with st.sidebar:
     st.divider()
     with st.expander("🛠️ OWNER PANEL"):
         pw = st.text_input("Admin Password:", type="password")
-        if pw == "
+        if pw == "RAHASIA-BEBEN-2026":
+            pbl = st.text_input("Nama Pembeli:")
+            if st.button("Generate License ✨"): 
+                st.code(gen_lic(pbl))
+    
+    if st.button("🗑️ Reset Pekerjaan"):
+        st.session_state['db'] = {}
+        st.rerun()
+
+# --- 4. MAIN CONTENT ---
+st.title("🎓 SkripsiGen Pro v8.48")
+st.caption("Auto-Formatter: Times New Roman, 1.5 Spacing, Margin 4333")
+
+c1, c2 = st.columns(2)
+with c1:
+    topik = st.text_input("📝 Judul Skripsi:", value=st.session_state['user_data']['topik'])
+    st.session_state['user_data']['topik'] = topik
+    lokasi = st.text_input("📍 Lokasi:", value=st.session_state['user_data']['lokasi'])
+    st.session_state['user_data']['lokasi'] = lokasi
+with c2:
+    kota = st.text_input("🏙️ Kota:", value=st.session_state['user_data']['kota'])
+    st.session_state['user_data']['kota'] = kota
+    metode = st.selectbox("🔬 Metode:", ["Kuantitatif", "Kualitatif", "R&D"])
+
+st.divider()
+pil_bab = st.selectbox("📄 Pilih Bagian:", ["Bab 1", "Bab 2", "Bab 3", "Bab 4", "Bab 5", "Lampiran: Surat Izin, Kuesioner & Kisi-kisi"])
+
+def jalankan_proses(target_bab=None, catatan_dosen=""):
+    bab_aktif = target_bab if target_bab else pil_bab
+    if topik and nama_user:
+        with st.spinner(f"Menyusun & Memformat {bab_aktif}..."):
+            try:
+                model = inisialisasi_ai()
+                prompt = f"Susun draf {bab_aktif} skripsi {metode} judul '{topik}' di {lokasi}, {kota}. Catatan: {catatan_dosen}. Gunakan Anti-Plagiarism, Paraphrase, Ref RIIL 2023-2026, APA 7th."
+                res = model.generate_content(prompt)
+                st.session_state['db'][bab_aktif] = res.text
+                st.success(f"{bab_aktif} Berhasil Disusun!")
+            except: st.error("Klik roket sekali lagi!")
+    else: st.warning("Nama dan Judul wajib diisi!")
+
+if st.button("🚀 Susun & Kalibrasi Sekarang"):
+    jalankan_proses()
+
+# --- 5. BOX OUTPUT ---
+if st.session_state['db']:
+    st.divider()
+    for b in sorted(st.session_state['db'].keys()):
+        content = st.session_state['db'][b]
+        with st.container(border=True):
+            st.markdown(f"### 📄 {b}")
+            is_trial = b in ["Bab 1", "Bab 2"]
+            is_pro = user_lic == gen_lic(nama_user)
+            if "Lampiran" not in b:
+                catatan = st.text_area(f"✍️ Revisi Dosen {b}:", key=f"rev_{b}")
+                if st.button(f"🔄 Jalankan Revisi {b}", key=f"br_{b}"):
+                    jalankan_proses(target_bab=b, catatan_dosen=catatan)
+            with st.expander(f"Lihat Hasil {b}"):
+                st.markdown(content)
+                if is_trial or is_pro:
+                    data_word = buat_dokumen_rapi(b, content)
+                    st.download_button(f"📥 Download {b}", data=data_word, file_name=f"{b}.docx", key=f"dl_{b}")
+                else:
+                    st.error(f"🔑 {b} Terkunci (Mode PRO)")
+                    nomor_wa = "6281273347072" 
+                    url_wa = f"https://wa.me/{nomor_wa}?text=Halo%20Admin%2C%20saya%20{nama_user}.%20Mau%20beli%20lisensi%20PRO."
+                    st.link_button("💬 Hubungi Admin (Beli Lisensi)", url_wa)
