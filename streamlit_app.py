@@ -25,29 +25,30 @@ def generate_license_logic(nama):
     nama_clean = nama.split(' ')[0].upper() if nama else "USER"
     return f"PRO-{nama_clean}-{hari_ini}-SKR"
 
-# --- 3. DATABASE SESI ---
+# --- 3. DATABASE SESI (TERMASUK STORAGE PUSTAKA) ---
 if 'db' not in st.session_state:
     st.session_state['db'] = {}
+if 'pustaka_koleksi' not in st.session_state:
+    st.session_state['pustaka_koleksi'] = ""
 
 # --- 4. TAMPILAN ---
-st.set_page_config(page_title="SkripsiGen Pro - Fixed Syntax", layout="wide")
+st.set_page_config(page_title="SkripsiGen Pro - Cumulative Ref", layout="wide")
 
 with st.expander("🛠️ Admin Panel (Owner Only)"):
     kunci_admin = st.text_input("Kunci Admin:", type="password")
     if kunci_admin == "BEBEN-BOSS":
-        st.subheader("Generator Kode Lisensi")
         pembeli = st.text_input("Nama Pembeli:")
         if st.button("Generate Kode"):
             st.code(generate_license_logic(pembeli))
 
-st.title("🎓 SkripsiGen Pro v6.8")
+st.title("🎓 SkripsiGen Pro v6.9")
 
 # FORM IDENTITAS
 c1, c2 = st.columns(2)
 with c1:
     nama_user = st.text_input("👤 Nama Lengkap Anda:", placeholder="Budi Santoso")
 with c2:
-    topik = st.text_input("📝 Judul Skripsi:", placeholder="Analisis Pengaruh...")
+    topik = st.text_input("📝 Judul Skripsi:", placeholder="Analisis Strategi...")
 
 st.divider()
 
@@ -62,36 +63,44 @@ with col_opt2:
 
 tab_buat, tab_revisi = st.tabs(["📝 Buat/Lihat Draf", "🔄 Revisi Dosen"])
 
-# FUNGSI PROMPT AKADEMIK
-def dapatkan_prompt(tipe, t, n, m, c=""):
+# FUNGSI PROMPT DENGAN MEMORI PUSTAKA
+def dapatkan_prompt_kumulatif(tipe, t, n, m, p_lama, c=""):
+    instruksi_pustaka = f"WAJIB: Masukkan referensi lama berikut ke dalam Daftar Pustaka: {p_lama}" if p_lama else ""
+    
     if "Surat Izin" in tipe:
         return f"Buatkan draf surat izin penelitian formal nama {n} judul {t}."
     elif "Instrumen" in tipe:
         return f"Buatkan instrumen penelitian {m} untuk judul {t}."
     elif c:
-        return f"Revisi {tipe} skripsi {m} judul {t} berdasarkan: {c}. Gunakan kutipan dan Daftar Pustaka APA 7th Edition."
+        return f"Revisi {tipe} skripsi {m} judul {t} berdasarkan: {c}. {instruksi_pustaka}. Gunakan kutipan dan Daftar Pustaka APA 7th Edition."
     else:
-        return f"Buatkan draf {tipe} skripsi {m} judul {t}. WAJIB gunakan kutipan di dalam teks dan sertakan Daftar Pustaka APA 7th Edition di bagian akhir."
+        return f"Buatkan draf {tipe} skripsi {m} judul {t}. {instruksi_pustaka}. WAJIB gunakan kutipan di teks dan sertakan Daftar Pustaka (Gabungan referensi lama dan baru) di akhir."
 
 with tab_buat:
     if st.button("🚀 Generate / Update Draf"):
         if topik and nama_user:
-            with st.spinner(f"Menyusun {bab_pilihan}..."):
+            with st.spinner(f"Menyusun {bab_pilihan} (Sinkronisasi Pustaka)..."):
                 try:
-                    p = dapatkan_prompt(bab_pilihan, topik, nama_user, metode)
+                    p = dapatkan_prompt_kumulatif(bab_pilihan, topik, nama_user, metode, st.session_state['pustaka_koleksi'])
                     res = model.generate_content(p)
                     st.session_state['db'][bab_pilihan] = res.text
+                    
+                    # Ambil bagian Daftar Pustaka dari hasil untuk disimpan ke memori
+                    if "DAFTAR PUSTAKA" in res.text.upper():
+                        parts = res.text.upper().split("DAFTAR PUSTAKA")
+                        st.session_state['pustaka_koleksi'] = parts[-1]
+                    
                     st.rerun()
                 except Exception as e: st.error(f"Gagal: {e}")
         else: st.warning("Isi Nama & Judul!")
 
 with tab_revisi:
-    catatan = st.text_area("✍️ Catatan Revisi Dosen untuk Bab ini:")
+    catatan = st.text_area("✍️ Catatan Revisi Dosen:")
     if st.button("Proses Revisi 🚀"):
         if catatan and topik:
-            with st.spinner("Merevisi sesuai standar..."):
+            with st.spinner("Merevisi & Sinkron Pustaka..."):
                 try:
-                    p = dapatkan_prompt(bab_pilihan, topik, nama_user, metode, catatan)
+                    p = dapatkan_prompt_kumulatif(bab_pilihan, topik, nama_user, metode, st.session_state['pustaka_koleksi'], catatan)
                     res = model.generate_content(p)
                     st.session_state['db'][bab_pilihan] = res.text
                     st.rerun()
@@ -110,14 +119,11 @@ if bab_pilihan in st.session_state['db']:
         user_license = st.text_input("Masukkan Kode Lisensi Anda:", type="password", key=f"lic_{bab_pilihan}")
     with col_lic2:
         st.write("") 
-        wa_num = "6283173826717"
-        st.link_button("📲 Beli Kode via WA", f"https://wa.me/{wa_num}")
+        st.link_button("📲 Beli Kode via WA", f"https://wa.me/6283173826717")
 
-    # LOGIKA DOWNLOAD
     if user_license == generate_license_logic(nama_user):
         st.success("✅ Lisensi Aktif!")
         doc = Document()
-        # Perbaikan baris yang error tadi:
         doc.add_heading(f"{bab_pilihan} - {topik}", 0)
         doc.add_paragraph(teks)
         bio = BytesIO()
@@ -125,5 +131,3 @@ if bab_pilihan in st.session_state['db']:
         st.download_button(f"📥 Download {bab_pilihan} (.docx)", data=bio.getvalue(), file_name=f"{bab_pilihan}.docx")
     elif user_license != "":
         st.error("❌ Kode Lisensi tidak cocok.")
-else:
-    st.info("Klik tombol 'Generate' untuk melihat draf.")
