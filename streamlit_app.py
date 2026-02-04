@@ -14,8 +14,7 @@ try:
                 if 'generateContent' in m.supported_generation_methods: return m.name
         except: pass
         return "models/gemini-pro"
-    active_model = get_active_model_name()
-    model = genai.GenerativeModel(active_model)
+    model = genai.GenerativeModel(get_active_model_name())
 except Exception as e:
     st.error(f"Koneksi Gagal: {e}")
     st.stop()
@@ -26,8 +25,12 @@ def generate_license_logic(nama):
     nama_clean = nama.split(' ')[0].upper() if nama else "USER"
     return f"PRO-{nama_clean}-{hari_ini}-SKR"
 
-# --- 3. TAMPILAN ---
-st.set_page_config(page_title="SkripsiGen Pro - Full Package", layout="wide")
+# --- 3. INISIALISASI PENYIMPANAN PROGRESS ---
+if 'database_skripsi' not in st.session_state:
+    st.session_state['database_skripsi'] = {} # Menyimpan hasil tiap bab: {'Bab 1': 'teks...', 'Bab 2': 'teks...'}
+
+# --- 4. TAMPILAN ---
+st.set_page_config(page_title="SkripsiGen Pro - Progress Saved", layout="wide")
 
 with st.expander("🛠️ Admin Panel (Owner Only)"):
     kunci_admin = st.text_input("Kunci Admin:", type="password")
@@ -37,89 +40,81 @@ with st.expander("🛠️ Admin Panel (Owner Only)"):
         if st.button("Generate Kode"):
             st.code(generate_license_logic(nama_pembeli))
 
-st.title("🎓 SkripsiGen Pro v6.1")
+st.title("🎓 SkripsiGen Pro v6.3")
+
+# --- FORM IDENTITAS ---
+col_id1, col_id2 = st.columns(2)
+with col_id1:
+    nama_user = st.text_input("👤 Nama Lengkap Anda:", placeholder="Budi Santoso", key="main_nama")
+with col_id2:
+    topik = st.text_input("📝 Judul Skripsi:", placeholder="Analisis Strategi...", key="main_judul")
+
+st.divider()
 
 # --- TAB SISTEM ---
-tab_buat, tab_revisi = st.tabs(["📝 Buat Draf Baru", "🔄 Fitur Revisi Dosen"])
+tab_buat, tab_revisi = st.tabs(["📝 Buat/Lihat Draf", "🔄 Fitur Revisi Dosen"])
 
 with tab_buat:
-    col1, col2 = st.columns(2)
-    with col1:
-        nama_user = st.text_input("👤 Nama Lengkap Anda:", key="n1")
-        topik = st.text_input("📝 Judul Skripsi:", key="t1")
-    with col2:
-        metode = st.selectbox("🔬 Pilih Metode:", ["Kuantitatif", "Kualitatif", "R&D"], key="m1")
-        bab_pilihan = st.selectbox("📄 Pilih Bab/Dokumen:", 
+    col_set1, col_set2 = st.columns(2)
+    with col_set1:
+        metode = st.selectbox("🔬 Pilih Metode:", ["Kuantitatif", "Kualitatif", "R&D"])
+    with col_set2:
+        bab_pilihan = st.selectbox("📄 Pilih Bab untuk Dikerjakan/Dilihat:", 
                                   ["Bab 1", "Bab 2", "Bab 3", "Bab 4", "Bab 5", 
-                                   "Lampiran: Instrumen", "Lampiran: Surat Izin"], key="b1")
+                                   "Lampiran: Instrumen", "Lampiran: Surat Izin"])
 
-    if st.button("Generate Draf Sekarang ✨"):
-        if topik and nama_user:
-            with st.spinner(f"Menyusun {bab_pilihan}..."):
-                # Logika Instruksi
-                if "Instrumen" in bab_pilihan:
-                    instruksi = f"Buatkan instrumen penelitian {metode} (kuesioner/pedoman wawancara) untuk judul {topik}."
-                elif "Surat Izin" in bab_pilihan:
-                    instruksi = f"Buatkan surat izin penelitian formal atas nama {nama_user} untuk judul {topik}."
-                else:
-                    instruksi = f"Buatkan draf {bab_pilihan} skripsi {metode} formal, mendalam, anti-plagiat, dan sertakan daftar pustaka."
-                
-                try:
-                    prompt = f"Judul: {topik}\nMetode: {metode}\nNama: {nama_user}\nTugas: {instruksi}"
-                    response = model.generate_content(prompt)
-                    hasil = response.text
-                    st.divider()
-                    st.write(hasil)
-                    
-                    # Simpan ke session state agar bisa di-download setelah cek lisensi
-                    st.session_state['hasil_gen'] = hasil
-                except Exception as e:
-                    st.error(f"Error: {e}")
-        else:
-            st.warning("Isi Nama dan Judul dulu!")
+    # Cek apakah bab ini sudah pernah di-generate sebelumnya
+    sudah_ada = bab_pilihan in st.session_state['database_skripsi']
+
+    col_btn1, col_btn2 = st.columns([1, 4])
+    with col_btn1:
+        if st.button("🚀 Generate Baru"):
+            if topik and nama_user:
+                with st.spinner(f"Menyusun {bab_pilihan}..."):
+                    prompt = f"Judul: {topik}\nNama: {nama_user}\nTugas: Buatkan draf {bab_pilihan} {metode} formal."
+                    try:
+                        response = model.generate_content(prompt)
+                        st.session_state['database_skripsi'][bab_pilihan] = response.text
+                        st.rerun() # Refresh agar tampilan update
+                    except Exception as e:
+                        st.error(f"Error: {e}")
+            else: st.warning("Isi Nama & Judul!")
+    
+    with col_btn2:
+        if sudah_ada:
+            st.success(f"✅ Data {bab_pilihan} tersedia di memori. Silakan scroll ke bawah untuk melihat/download.")
 
 with tab_revisi:
-    st.info("Gunakan tab ini untuk memperbaiki draf berdasarkan masukan dosen.")
-    col_r1, col_r2 = st.columns(2)
-    with col_r1:
-        nama_rev = st.text_input("👤 Nama Lengkap:", key="n2")
-        topik_rev = st.text_input("📝 Judul Saat Ini:", key="t2")
-    with col_r2:
-        bab_rev = st.selectbox("🎯 Bab yang Direvisi:", ["Bab 1", "Bab 2", "Bab 3", "Bab 4", "Bab 5"], key="b2")
-        catatan = st.text_area("✍️ Catatan/Revisi Dosen:", placeholder="Contoh: Tambahkan teori X...")
-
+    st.info("Fitur revisi akan memperbarui draf yang sudah ada di memori.")
+    catatan = st.text_area("✍️ Masukkan Catatan Dosen untuk Bab yang dipilih:")
     if st.button("Proses Revisi 🚀"):
-        if catatan and topik_rev:
+        if catatan and topik:
             with st.spinner("Mengolah revisi..."):
-                prompt_rev = f"Mahasiswa {nama_rev} judul {topik_rev}. Revisi {bab_rev} berdasarkan: {catatan}. Tulis ulang bab tersebut dan jelaskan dampak perubahannya ke bab selanjutnya agar konsisten."
-                try:
-                    response = model.generate_content(prompt_rev)
-                    hasil_rev = response.text
-                    st.divider()
-                    st.write(hasil_rev)
-                    st.session_state['hasil_gen'] = hasil_rev
-                except Exception as e:
-                    st.error(f"Error: {e}")
+                prompt_rev = f"Revisi {bab_pilihan} judul {topik} berdasarkan: {catatan}. Tulis ulang."
+                response = model.generate_content(prompt_rev)
+                st.session_state['database_skripsi'][bab_pilihan] = response.text
+                st.rerun()
 
-# --- SIDEBAR & DOWNLOAD (BERLAKU UNTUK KEDUA TAB) ---
-with st.sidebar:
-    st.header("🔓 Aktivasi Download")
-    st.write("Beli lisensi untuk ambil file Word (.docx).")
-    wa_number = "6283173826717"
-    st.link_button("📲 Beli Lisensi via WA", f"https://wa.me/{wa_number}")
-    user_license = st.text_input("Masukkan Kode Lisensi:", type="password")
+# --- AREA HASIL & DOWNLOAD (PERSISTENT) ---
+if bab_pilihan in st.session_state['database_skripsi']:
+    teks_hasil = st.session_state['database_skripsi'][bab_pilihan]
+    st.divider()
+    st.subheader(f"📄 Hasil Pengerjaan: {bab_pilihan}")
+    st.write(teks_hasil)
     
-    # Tombol Download hanya muncul jika sudah ada hasil dan lisensi benar
-    if 'hasil_gen' in st.session_state:
-        # Cek lisensi (menggunakan nama dari tab mana pun yang diisi)
-        current_name = nama_user if nama_user else nama_rev
-        if user_license == generate_license_logic(current_name):
-            st.success("✅ Lisensi Aktif!")
-            doc = Document()
-            doc.add_heading("Draf Skripsi", 0)
-            doc.add_paragraph(st.session_state['hasil_gen'])
-            bio = BytesIO()
-            doc.save(bio)
-            st.download_button("📥 Download (.docx)", data=bio.getvalue(), file_name="Draf_Skripsi.docx")
-        elif user_license != "":
-            st.error("❌ Kode Salah!")
+    # Bagian Aktivasi
+    st.info("🔓 **Aktivasi Download**")
+    col_dl1, col_dl2 = st.columns([2, 1])
+    with col_dl1:
+        user_license = st.text_input(f"Masukkan Kode Lisensi ({nama_user}):", type="password")
+    with col_dl2:
+        st.write("") 
+        st.link_button("📲 Beli Kode via WA", f"https://wa.me/6283173826717")
+
+    if user_license == generate_license_logic(nama_user):
+        st.success("✅ Lisensi Aktif!")
+        doc = Document()
+        doc.add_heading(bab_pilihan, 0)
+        doc.add_paragraph(teks_hasil)
+        bio = BytesIO()
+        doc.save(bio)
