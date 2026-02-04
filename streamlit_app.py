@@ -4,20 +4,19 @@ from docx import Document
 from io import BytesIO
 from datetime import datetime
 
-# --- 1. KONFIGURASI API (DENGAN PENANGANAN ERROR MODEL) ---
+# --- 1. KONFIGURASI API ---
 try:
     api_key = st.secrets["GEMINI_API_KEY"]
     genai.configure(api_key=api_key)
     
-    # Fungsi otomatis mencari model yang aktif di akun Anda
     def get_active_model_name():
         try:
             for m in genai.list_models():
                 if 'generateContent' in m.supported_generation_methods:
-                    # Cari yang ada nama 'flash' dulu, kalau tidak ada pakai apa saja yang tersedia
                     return m.name
         except:
-            return "models/gemini-pro" # Fallback terakhir
+            pass
+        return "models/gemini-pro"
             
     active_model = get_active_model_name()
     model = genai.GenerativeModel(active_model)
@@ -32,7 +31,7 @@ def generate_license_logic(nama):
     return f"PRO-{nama_clean}-{hari_ini}-SKR"
 
 # --- 3. TAMPILAN ---
-st.set_page_config(page_title="SkripsiGen Pro - Anti Error", layout="wide")
+st.set_page_config(page_title="SkripsiGen Pro - Full Package", layout="wide")
 
 with st.expander("🛠️ Admin Panel (Owner Only)"):
     kunci_admin = st.text_input("Kunci Admin:", type="password")
@@ -41,7 +40,8 @@ with st.expander("🛠️ Admin Panel (Owner Only)"):
         nama_pembeli = st.text_input("Nama Pembeli:")
         if st.button("Generate Kode"):
             st.code(generate_license_logic(nama_pembeli))
-    else: st.write("Terkunci.")
+    else: 
+        st.write("Silakan masukkan kunci admin.")
 
 st.title("🎓 SkripsiGen Pro v5.8")
 st.caption(f"Sistem aktif menggunakan model: {active_model}")
@@ -50,7 +50,7 @@ st.caption(f"Sistem aktif menggunakan model: {active_model}")
 col1, col2 = st.columns(2)
 with col1:
     nama_user = st.text_input("👤 Nama Lengkap Anda:", placeholder="Budi Santoso")
-    topik = st.text_input("📝 Judul Skripsi:", placeholder="Contoh: Pengaruh Lingkungan Kerja...")
+    topik = st.text_input("📝 Judul Skripsi:", placeholder="Contoh: Analisis Kinerja...")
 
 with col2:
     metode = st.selectbox("🔬 Pilih Metodologi Penelitian:", 
@@ -79,7 +79,6 @@ with st.sidebar:
 if st.button(f"Generate {bab_pilihan} ✨"):
     if topik and nama_user:
         with st.spinner(f"Menyusun {bab_pilihan}..."):
-            # --- LOGIKA KONTEN ---
             if "Instrumen" in bab_pilihan:
                 if "Kuantitatif" in metode:
                     instruksi = "Buatkan Kuesioner Skala Likert (1-5) lengkap dengan kisi-kisi instrumen."
@@ -94,8 +93,6 @@ if st.button(f"Generate {bab_pilihan} ✨"):
 
             try:
                 prompt = f"Judul: {topik}\nMetode: {metode}\nNama Mahasiswa: {nama_user}\nTugas: {instruksi}\nSertakan Daftar Pustaka APA 7th Edition."
-                
-                # Menggunakan generate_content dengan penanganan fallback jika nama model berubah
                 response = model.generate_content(prompt)
                 hasil = response.text
                 
@@ -104,7 +101,18 @@ if st.button(f"Generate {bab_pilihan} ✨"):
                 st.write(hasil)
                 
                 # VALIDASI LISENSI
-                if user_license == generate_license_logic(nama_user):
-                    st.success("✅ Lisensi Aktif!")
+                kode_seharusnya = generate_license_logic(nama_user)
+                if user_license == kode_seharusnya:
+                    st.success("✅ Lisensi Aktif! Silakan download.")
                     doc = Document()
-                    doc.add_heading(
+                    doc.add_heading(f"{bab_pilihan}", 0)
+                    doc.add_paragraph(hasil)
+                    bio = BytesIO()
+                    doc.save(bio)
+                    st.download_button("📥 Download File Word", data=bio.getvalue(), file_name=f"{bab_pilihan.replace(':', '')}_{nama_user}.docx")
+                else:
+                    st.warning("⚠️ Masukkan Kode Lisensi di sidebar untuk download file Word.")
+            except Exception as e:
+                st.error(f"Gagal generate: {e}")
+    else:
+        st.warning("Nama dan Judul wajib diisi!")
