@@ -8,8 +8,12 @@ from datetime import datetime
 import random
 import re
 
-# --- 1. CONFIG HALAMAN (STABIL) ---
-st.set_page_config(page_title="SkripsiGen Pro v8.77", page_icon="🎓", layout="wide")
+# --- 1. INITIAL CONFIG ---
+st.set_page_config(
+    page_title="SkripsiGen Pro - Solusi Skripsi Otomatis",
+    page_icon="🎓",
+    layout="wide"
+)
 
 # --- 2. DATABASE & SESSION STATE ---
 if 'db' not in st.session_state: st.session_state['db'] = {}
@@ -21,21 +25,20 @@ if 'user_data' not in st.session_state:
         "nama": ""
     }
 
-# --- 3. ENGINE SETUP (MULTI-KEY & FLASH MODE) ---
+# --- 3. ENGINE SETUP (MULTI-KEY & FALLBACK) ---
 def inisialisasi_ai():
     try:
-        # Mengambil daftar kunci dari Secrets Streamlit
         keys = st.secrets.get("GEMINI_API_KEYS", [st.secrets.get("GEMINI_API_KEY", "")])
         key_aktif = random.choice(keys)
         genai.configure(api_key=key_aktif)
         
-        # Menggunakan Gemini 1.5 Flash agar kuota awet dan tidak cepat habis
+        # Menggunakan Flash agar kuota awet (Saran terbaik tadi siang)
         return genai.GenerativeModel('gemini-1.5-flash')
     except Exception as e:
         st.error(f"⚠️ Masalah API Key: {e}")
         st.stop()
 
-# --- 4. FORMATTING ENGINE (4333 & Times New Roman) ---
+# --- 4. FORMATTING ENGINE (Standar 4333) ---
 def buat_dokumen_rapi(judul_bab, isi_teks):
     doc = Document()
     for sec in doc.sections:
@@ -74,10 +77,37 @@ with st.sidebar:
 
     st.divider()
     
-    # OWNER PANEL (Password: RAHASIA-BEBEN-2026)
+    # OWNER PANEL
     with st.expander("🛠️ OWNER PANEL"):
         pw = st.text_input("Admin Password:", type="password")
         if pw == "RAHASIA-BEBEN-2026": 
             st.success("Halo Bos Beben!")
             pbl = st.text_input("Nama Pembeli:")
-            if st.button("
+            if st.button("Generate License ✨"):
+                st.code(gen_lic(pbl))
+    
+    if st.button("🗑️ Reset Semua"):
+        st.session_state['db'] = {}
+        st.rerun()
+
+# --- 6. TAMPILAN UTAMA (INPUT) ---
+st.title("🎓 SkripsiGen Pro v8.78")
+st.caption("Standard: Academic Formatting 4-3-3-3 | Font: Times New Roman 12")
+
+c1, c2 = st.columns(2)
+with c1:
+    st.session_state['user_data']['topik'] = st.text_input("📝 Judul Skripsi:", value=st.session_state['user_data']['topik'])
+    st.session_state['user_data']['lokasi'] = st.text_input("📍 Instansi/Lokasi:", value=st.session_state['user_data']['lokasi'])
+with c2:
+    st.session_state['user_data']['kota'] = st.text_input("🏙️ Kota/Provinsi:", value=st.session_state['user_data']['kota'])
+    metode = st.selectbox("🔬 Metode Penelitian:", ["Kuantitatif", "Kualitatif", "R&D"])
+
+st.divider()
+pil_bab = st.selectbox("📄 Pilih Bagian:", ["Bab 1", "Bab 2", "Bab 3", "Bab 4", "Bab 5", "Daftar Pustaka"])
+
+if st.button("🚀 Susun & Kalibrasi Sekarang"):
+    if st.session_state['user_data']['topik'] and nama_user:
+        with st.spinner("AI sedang meramu skripsi..."):
+            model = inisialisasi_ai()
+            prompt = f"""Susun {pil_bab} skripsi {metode} judul '{st.session_state['user_data']['topik']}' 
+            di {st.session_state['user_data']['lokasi
