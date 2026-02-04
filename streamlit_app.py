@@ -25,117 +25,108 @@ def generate_license_logic(nama):
     nama_clean = nama.split(' ')[0].upper() if nama else "USER"
     return f"PRO-{nama_clean}-{hari_ini}-SKR"
 
-# --- 3. DATABASE SESI ---
+# --- 3. DATABASE SESI (PERSISTENT STORAGE) ---
 if 'db' not in st.session_state:
-    st.session_state['db'] = {}
+    st.session_state['db'] = {} # Format: {'Bab 1': 'teks...', 'Bab 2': 'teks...'}
 if 'pustaka_koleksi' not in st.session_state:
     st.session_state['pustaka_koleksi'] = ""
 
 # --- 4. TAMPILAN DASHBOARD ---
-st.set_page_config(page_title="SkripsiGen Pro v7.8", layout="wide")
+st.set_page_config(page_title="SkripsiGen Pro v8.0", layout="wide")
 
-with st.expander("🛠️ Admin Panel"):
-    kunci_admin = st.text_input("Kunci Admin:", type="password")
-    if kunci_admin == "BEBEN-BOSS":
-        pembeli = st.text_input("Nama Pembeli:")
-        if st.button("Generate Kode"):
-            st.code(generate_license_logic(pembeli))
+with st.sidebar:
+    st.title("🛡️ Panel Aktivasi")
+    nama_user = st.text_input("👤 Nama Mahasiswa:", placeholder="Budi Santoso")
+    user_license = st.text_input("🔑 Kode Lisensi:", type="password")
+    
+    st.divider()
+    st.write("Belum punya kode?")
+    st.link_button("📲 Beli Lisensi (WA)", "https://wa.me/6283173826717")
+    
+    st.divider()
+    if st.button("🗑️ Hapus Semua Dokumen"):
+        st.session_state['db'] = {}
+        st.session_state['pustaka_koleksi'] = ""
+        st.rerun()
 
-st.title("🎓 SkripsiGen Pro v7.8")
-st.caption("Standar Akademik Tinggi | Referensi 2023-2026")
+st.title("🎓 SkripsiGen Pro v8.0")
+st.caption("Manajemen Dokumen Skripsi Otomatis | Referensi 2023-2026")
 
 # --- 5. INPUT DATA ---
 c1, c2 = st.columns(2)
 with c1:
-    nama_user = st.text_input("👤 Nama Mahasiswa:", placeholder="Budi Santoso")
     topik = st.text_input("📝 Judul Skripsi:", placeholder="Pengaruh X terhadap Y...")
-with c2:
     lokasi = st.text_input("📍 Lokasi Penelitian:", placeholder="SMA Negeri 1 Jakarta")
+with c2:
     kota = st.text_input("🏙️ Kota & Provinsi:", placeholder="Jakarta, DKI Jakarta")
+    metode = st.selectbox("🔬 Metode:", ["Kuantitatif", "Kualitatif", "R&D"])
 
 st.divider()
 
-# --- 6. PENGATURAN ---
-o1, o2 = st.columns(2)
-with o1:
-    metode = st.selectbox("🔬 Metode:", ["Kuantitatif", "Kualitatif", "R&D"])
-with o2:
-    bab_pilihan = st.selectbox("📄 Pilih Bab:", 
-                              ["Bab 1: Pendahuluan", "Bab 2: Tinjauan Pustaka", "Bab 3: Metodologi Penelitian", 
-                               "Bab 4: Hasil dan Pembahasan", "Bab 5: Penutup", "Lampiran: Instrumen", "Lampiran: Surat Izin"])
+# --- 6. GENERATOR ---
+col_gen1, col_gen2 = st.columns([2, 1])
+with col_gen1:
+    bab_pilihan = st.selectbox("📄 Pilih Bagian untuk di-Generate:", 
+                              ["Bab 1", "Bab 2", "Bab 3", "Bab 4", "Bab 5", "Lampiran: Instrumen", "Lampiran: Surat Izin"])
+with col_gen2:
+    st.write("") # Spacer
+    btn_gen = st.button("🚀 Generate Sekarang")
 
-tab1, tab2 = st.tabs(["📝 Buat Baru", "🔄 Revisi Dosen"])
+if btn_gen:
+    if topik and nama_user:
+        with st.spinner(f"Menyusun {bab_pilihan}..."):
+            tahun_skrg = 2026
+            rentang = f"{tahun_skrg-3}-{tahun_skrg}"
+            
+            # Logika Prompt Khusus
+            if "Bab 2" in bab_pilihan:
+                prompt = f"Bedah judul {topik} per variabel. Buat landasan teori mendalam, indikator, dan penelitian terdahulu tahun {rentang} untuk mahasiswa {nama_user}. Gunakan sitasi APA 7th dan Daftar Pustaka."
+            else:
+                prompt = f"Buat draf {bab_pilihan} skripsi {metode} judul {topik} lokasi {lokasi}. Referensi wajib {rentang}. Gunakan sitasi APA 7th dan Daftar Pustaka."
+            
+            try:
+                res = model.generate_content(prompt).text
+                st.session_state['db'][bab_pilihan] = res
+                if "DAFTAR PUSTAKA" in res.upper():
+                    st.session_state['pustaka_koleksi'] += "\n" + res.upper().split("DAFTAR PUSTAKA")[-1]
+                st.rerun()
+            except Exception as e: st.error(f"Gagal: {e}")
+    else: st.warning("Isi Nama di sidebar dan Judul di atas!")
 
-# --- 7. FUNGSI PROMPT ---
-def buat_prompt(tipe, t, n, m, l, k, p_lama, rev=""):
-    thn = 2026
-    rentang = f"{thn-3} s/d {thn}"
-    pustaka_msg = f"Gunakan referensi lama ini jika relevan: {p_lama}" if p_lama else ""
-    
-    if "Bab 1" in tipe:
-        desc = f"Latar belakang piramida terbalik dari Nasional ke {k} lalu ke {l}. Gunakan data statistik {rentang}."
-    elif "Bab 2" in tipe:
-        desc = f"Bedah judul {t} per variabel. Teori mendalam per kata kunci, indikator, dan penelitian terdahulu {rentang}."
-    elif "Surat" in tipe:
-        return f"Buat surat izin penelitian formal untuk {n} judul {t} lokasi {l}."
-    else:
-        desc = f"Susun {tipe} dengan referensi {rentang} di lokasi {l}."
+st.divider()
 
-    base = f"Buatkan draf {tipe} skripsi {m} judul {t} untuk mahasiswa {n}. {desc}. {pustaka_msg}. Wajib sitasi APA 7th dan Daftar Pustaka {rentang}."
-    
-    if rev:
-        return f"REVISI {tipe} berdasarkan catatan: {rev}. Judul: {t}. Referensi wajib {rentang}."
-    return base
-
-# --- 8. TOMBOL AKSI ---
-with tab1:
-    if st.button("🚀 Mulai Generate Sekarang"):
-        if topik and nama_user:
-            with st.spinner("Sedang menyusun draf akademik..."):
-                try:
-                    p = buat_prompt(bab_pilihan, topik, nama_user, metode, lokasi, kota, st.session_state['pustaka_koleksi'])
-                    res = model.generate_content(p).text
-                    st.session_state['db'][bab_pilihan] = res
-                    if "DAFTAR PUSTAKA" in res.upper():
-                        st.session_state['pustaka_koleksi'] += "\n" + res.upper().split("DAFTAR PUSTAKA")[-1]
+# --- 7. DISPLAY HASIL DALAM BOX ---
+st.subheader("📁 Koleksi Dokumen Anda")
+if not st.session_state['db']:
+    st.info("Belum ada dokumen yang di-generate.")
+else:
+    # Menampilkan setiap dokumen dalam box (expander/container)
+    for bab, isi in st.session_state['db'].items():
+        with st.container(border=True):
+            col_header1, col_header2 = st.columns([5, 1])
+            with col_header1:
+                st.markdown(f"### 📄 {bab}")
+            with col_header2:
+                # Tombol Hapus per dokumen
+                if st.button(f"🗑️ Hapus", key=f"del_{bab}"):
+                    del st.session_state['db'][bab]
                     st.rerun()
-                except Exception as e: st.error(f"Gagal: {e}")
-        else: st.warning("Nama dan Judul wajib diisi!")
-
-with tab2:
-    catatan_rev = st.text_area("✍️ Masukkan Catatan Revisi Dosen:")
-    if st.button("Proses Perbaikan 🚀"):
-        if catatan_rev and topik:
-            with st.spinner("Memperbaiki draf..."):
-                try:
-                    p_rev = buat_prompt(bab_pilihan, topik, nama_user, metode, lokasi, kota, st.session_state['pustaka_koleksi'], rev=catatan_rev)
-                    res_rev = model.generate_content(p_rev).text
-                    st.session_state['db'][bab_pilihan] = res_rev
-                    st.rerun()
-                except Exception as e: st.error(f"Gagal: {e}")
-
-# --- 9. HASIL & LISENSI ---
-if bab_pilihan in st.session_state['db']:
-    konten = st.session_state['db'][bab_pilihan]
-    st.divider()
-    st.subheader(f"📄 Hasil {bab_pilihan}")
-    st.markdown(konten)
-    
-    st.info("🔓 **Aktivasi Download Dokumen**")
-    l1, l2 = st.columns([2, 1])
-    with l1:
-        lisensi_input = st.text_input("Masukkan Kode Lisensi:", type="password", key=f"key_{bab_pilihan}")
-    with l2:
-        st.write("")
-        st.link_button("📲 Beli Kode via WA", f"https://wa.me/6283173826717")
-
-    if lisensi_input == generate_license_logic(nama_user):
-        st.success("✅ Lisensi Aktif!")
-        doc = Document()
-        doc.add_heading(bab_pilihan, 0)
-        doc.add_paragraph(konten)
-        bio = BytesIO()
-        doc.save(bio)
-        st.download_button("📥 Download Word (.docx)", data=bio.getvalue(), file_name=f"{bab_pilihan}.docx")
-    elif lisensi_input != "":
-        st.error("❌ Kode Salah!")
+            
+            # Preview isi draf
+            st.markdown(isi[:500] + "..." if len(isi) > 500 else isi)
+            
+            with st.expander("Lihat Selengkapnya & Download"):
+                st.markdown(isi)
+                st.divider()
+                
+                # Logika Aktivasi per Box
+                if user_license == generate_license_logic(nama_user):
+                    st.success("✅ Lisensi Aktif")
+                    doc = Document()
+                    doc.add_heading(bab, 0)
+                    doc.add_paragraph(isi)
+                    bio = BytesIO()
+                    doc.save(bio)
+                    st.download_button(f"📥 Download {bab} (.docx)", data=bio.getvalue(), file_name=f"{bab}.docx", key=f"dl_{bab}")
+                else:
+                    st.warning("⚠️ Masukkan lisensi di sidebar untuk download.")
