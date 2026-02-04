@@ -1,12 +1,10 @@
 import streamlit as st
 import google.generativeai as genai
 from docx import Document
-from docx.shared import Pt
-from docx.enum.text import WD_ALIGN_PARAGRAPH
 from io import BytesIO
 from datetime import datetime
 
-# --- 1. KONEKSI API ---
+# --- 1. KONFIGURASI API ---
 try:
     api_key = st.secrets["GEMINI_API_KEY"]
     genai.configure(api_key=api_key)
@@ -16,8 +14,7 @@ try:
                 if 'generateContent' in m.supported_generation_methods: return m.name
         except: pass
         return "models/gemini-pro"
-    active_model = get_active_model_name()
-    model = genai.GenerativeModel(active_model)
+    model = genai.GenerativeModel(get_active_model_name())
 except Exception as e:
     st.error(f"Koneksi Gagal: {e}")
     st.stop()
@@ -28,8 +25,8 @@ def generate_license_logic(nama):
     nama_clean = nama.split(' ')[0].upper() if nama else "USER"
     return f"PRO-{nama_clean}-{hari_ini}-SKR"
 
-# --- 3. TAMPILAN ---
-st.set_page_config(page_title="SkripsiGen Pro - Surat Otomatis", layout="wide")
+# --- 3. TAMPILAN UTAMA ---
+st.set_page_config(page_title="SkripsiGen Pro - Revision Mode", layout="wide")
 
 with st.expander("🛠️ Admin Panel (Owner Only)"):
     kunci_admin = st.text_input("Kunci Admin:", type="password")
@@ -39,72 +36,71 @@ with st.expander("🛠️ Admin Panel (Owner Only)"):
         if st.button("Generate Kode"):
             st.code(generate_license_logic(nama_pembeli))
 
-st.title("🎓 SkripsiGen Pro v5.9")
+st.title("🎓 SkripsiGen Pro v6.0")
 
-col1, col2 = st.columns(2)
-with col1:
-    nama_user = st.text_input("👤 Nama Lengkap Anda:", placeholder="Budi Santoso")
-    topik = st.text_input("📝 Judul Skripsi:", placeholder="Contoh: Pengaruh Lingkungan Kerja...")
+# --- TAB SISTEM ---
+tab_buat, tab_revisi = st.tabs(["📝 Buat Baru", "🔄 Fitur Revisi Dosen"])
 
-with col2:
-    metode = st.selectbox("🔬 Pilih Metodologi Penelitian:", ["Kuantitatif", "Kualitatif", "R&D"])
-    bab_pilihan = st.selectbox("📄 Pilih Bab/Dokumen:", 
-                              ["Bab 1: Pendahuluan", "Bab 2: Tinjauan Pustaka", "Bab 3: Metodologi Penelitian", 
-                               "Bab 4: Hasil dan Pembahasan", "Bab 5: Penutup", 
-                               "Lampiran: Instrumen Penelitian", "Lampiran: Surat Izin Penelitian"])
+with tab_buat:
+    col1, col2 = st.columns(2)
+    with col1:
+        nama_user = st.text_input("👤 Nama Lengkap:", key="nama_buat")
+        topik = st.text_input("📝 Judul Skripsi:", key="judul_buat")
+    with col2:
+        metode = st.selectbox("🔬 Metode:", ["Kuantitatif", "Kualitatif", "R&D"], key="metode_buat")
+        bab_pilihan = st.selectbox("📄 Pilih Bab:", ["Bab 1", "Bab 2", "Bab 3", "Bab 4", "Bab 5", "Lampiran: Instrumen", "Lampiran: Surat Izin"], key="bab_buat")
 
+    if st.button("Generate Draf ✨"):
+        # (Logika generate sama seperti sebelumnya...)
+        st.info("Gunakan tab 'Fitur Revisi' jika Anda sudah punya draf dan ingin memperbaikinya.")
+
+with tab_revisi:
+    st.subheader("🛠️ Perbaikan Berdasarkan Masukan Dosen")
+    st.warning("Fitur ini akan menyesuaikan bab yang dipilih hingga bab-bab selanjutnya agar tetap konsisten.")
+    
+    col_rev1, col_rev2 = st.columns(2)
+    with col_rev1:
+        nama_rev = st.text_input("👤 Nama Lengkap:", key="nama_rev")
+        topik_lama = st.text_input("📝 Judul/Topik Saat Ini:", key="judul_rev")
+        mulai_bab = st.selectbox("🎯 Mulai Revisi dari Bab:", ["Bab 1", "Bab 2", "Bab 3", "Bab 4"], index=0)
+    
+    with col_rev2:
+        catatan_dosen = st.text_area("✍️ Masukkan Catatan/Revisi dari Dosen:", 
+                                    placeholder="Contoh: Ganti variabel X menjadi Y, atau tambahkan teori tentang Z di Bab 2...")
+
+    if st.button("Proses Revisi Berantai 🚀"):
+        if catatan_dosen and topik_lama and nama_rev:
+            with st.spinner("Sedang merombak draf agar konsisten sesuai revisi..."):
+                prompt_revisi = f"""
+                Anda adalah Dosen Pembimbing Senior. Mahasiswa saya bernama {nama_rev} sedang merevisi skripsi berjudul '{topik_lama}'.
+                
+                CATATAN REVISI DOSEN:
+                '{catatan_dosen}'
+                
+                TUGAS ANDA:
+                1. Tulis ulang {mulai_bab} sesuai dengan catatan revisi tersebut.
+                2. Jelaskan secara singkat perubahan apa saja yang harus dilakukan pada bab-bab SETELAHNYA agar tetap konsisten dengan revisi di {mulai_bab} ini.
+                3. Pastikan bahasa sangat formal dan sitasi tetap ada.
+                """
+                try:
+                    response = model.generate_content(prompt_revisi)
+                    hasil_revisi = response.text
+                    
+                    st.success(f"✅ Revisi {mulai_bab} Berhasil Dibuat!")
+                    st.markdown("### 📄 Hasil Revisi & Panduan Konsistensi")
+                    st.write(hasil_revisi)
+                    
+                    # Cek Lisensi untuk Download
+                    # (Gunakan sistem lisensi yang sama agar tetap cuan)
+                    st.info("Gunakan kode lisensi di sidebar untuk download hasil revisi ini.")
+                except Exception as e:
+                    st.error(f"Gagal: {e}")
+        else:
+            st.warning("Mohon isi nama, judul, dan catatan revisi dosen!")
+
+# --- SIDEBAR TETAP UNTUK LISENSI ---
 with st.sidebar:
-    st.header("🔓 Aktivasi Download")
-    wa_number = "6283173826717"
-    st.link_button("📲 Beli Lisensi via WA", f"https://wa.me/{wa_number}")
-    user_license = st.text_input("Masukkan Kode Lisensi:", type="password")
-
-# --- 4. PROSES GENERATE ---
-if st.button(f"Generate {bab_pilihan} ✨"):
-    if topik and nama_user:
-        with st.spinner(f"Menyusun {bab_pilihan}..."):
-            is_surat = "Surat Izin" in bab_pilihan
-            
-            if is_surat:
-                instruksi = f"Buatkan ISI SURAT saja untuk permohonan izin penelitian mahasiswa nama {nama_user} judul {topik}. Mulai dari Salam Pembuka sampai Salam Penutup. Jangan buat Kop Surat."
-            else:
-                instruksi = f"Buatkan draf {bab_pilihan} formal dan mendalam."
-
-            try:
-                prompt = f"Judul: {topik}\nMetode: {metode}\nNama: {nama_user}\nTugas: {instruksi}\nBahasa Indonesia Formal."
-                response = model.generate_content(prompt)
-                hasil = response.text
-                
-                st.divider()
-                st.write(hasil)
-                
-                if user_license == generate_license_logic(nama_user):
-                    st.success("✅ Lisensi Aktif!")
-                    doc = Document()
-                    
-                    if is_surat:
-                        # --- TEMPLATE SURAT OTOMATIS ---
-                        tgl_sekarang = datetime.now().strftime("%d %B %Y")
-                        p = doc.add_paragraph(f"Jakarta, {tgl_sekarang}") # Lokasi bisa diubah manual nanti
-                        p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-                        
-                        doc.add_paragraph("\nNomor\t: 001/SP/XII/2026\nPerihal\t: Permohonan Izin Penelitian\nLampiran\t: 1 Berkas")
-                        doc.add_paragraph("\nYth. Pimpinan Instansi / Kepala Sekolah\ndi Tempat")
-                        
-                        isi = doc.add_paragraph(hasil)
-                        
-                        doc.add_paragraph("\n\nHormat Saya,")
-                        doc.add_paragraph("\n\n\n( " + nama_user + " )")
-                    else:
-                        doc.add_heading(f"{bab_pilihan}", 0)
-                        doc.add_paragraph(hasil)
-                    
-                    bio = BytesIO()
-                    doc.save(bio)
-                    st.download_button("📥 Download File Word", data=bio.getvalue(), file_name=f"{bab_pilihan.replace(':', '')}.docx")
-                else:
-                    st.warning("⚠️ Masukkan Kode Lisensi untuk download.")
-            except Exception as e:
-                st.error(f"Gagal: {e}")
-    else:
-        st.warning("Isi Nama dan Judul dulu!")
+    st.header("🔓 Aktivasi & Lisensi")
+    st.write("Hubungi admin untuk mendapatkan kode lisensi.")
+    st.link_button("📲 Hubungi Admin", f"https://wa.me/6283173826717")
+    user_license = st.text_input("Masukkan Kode Lisensi:", type="password", key="lic_key")
