@@ -25,14 +25,14 @@ def generate_license_logic(nama):
     nama_clean = nama.split(' ')[0].upper() if nama else "USER"
     return f"PRO-{nama_clean}-{hari_ini}-SKR"
 
-# --- 3. DATABASE SESI (TERMASUK STORAGE PUSTAKA) ---
+# --- 3. DATABASE SESI ---
 if 'db' not in st.session_state:
     st.session_state['db'] = {}
 if 'pustaka_koleksi' not in st.session_state:
     st.session_state['pustaka_koleksi'] = ""
 
 # --- 4. TAMPILAN ---
-st.set_page_config(page_title="SkripsiGen Pro - Cumulative Ref", layout="wide")
+st.set_page_config(page_title="SkripsiGen Pro - Data Fenomena", layout="wide")
 
 with st.expander("🛠️ Admin Panel (Owner Only)"):
     kunci_admin = st.text_input("Kunci Admin:", type="password")
@@ -41,14 +41,16 @@ with st.expander("🛠️ Admin Panel (Owner Only)"):
         if st.button("Generate Kode"):
             st.code(generate_license_logic(pembeli))
 
-st.title("🎓 SkripsiGen Pro v6.9")
+st.title("🎓 SkripsiGen Pro v7.0")
 
-# FORM IDENTITAS
-c1, c2 = st.columns(2)
-with c1:
+# FORM IDENTITAS & LOKASI
+col_id1, col_id2 = st.columns(2)
+with col_id1:
     nama_user = st.text_input("👤 Nama Lengkap Anda:", placeholder="Budi Santoso")
-with c2:
-    topik = st.text_input("📝 Judul Skripsi:", placeholder="Analisis Strategi...")
+    topik = st.text_input("📝 Judul Skripsi:", placeholder="Analisis Pengaruh...")
+with col_id2:
+    lokasi_penelitian = st.text_input("📍 Lokasi Spesifik Penelitian:", placeholder="Contoh: SMA Negeri 1 Jakarta / PT. Maju Jaya")
+    kab_prov = st.text_input("🏙️ Kota & Provinsi:", placeholder="Contoh: Jakarta Selatan, DKI Jakarta")
 
 st.divider()
 
@@ -63,44 +65,47 @@ with col_opt2:
 
 tab_buat, tab_revisi = st.tabs(["📝 Buat/Lihat Draf", "🔄 Revisi Dosen"])
 
-# FUNGSI PROMPT DENGAN MEMORI PUSTAKA
-def dapatkan_prompt_kumulatif(tipe, t, n, m, p_lama, c=""):
-    instruksi_pustaka = f"WAJIB: Masukkan referensi lama berikut ke dalam Daftar Pustaka: {p_lama}" if p_lama else ""
+# FUNGSI PROMPT DENGAN LOGIKA DATA FENOMENA
+def dapatkan_prompt_fenomena(tipe, t, n, m, lok, kota, p_lama, c=""):
+    instruksi_pustaka = f"Sertakan daftar pustaka lama ini: {p_lama}" if p_lama else ""
     
-    if "Surat Izin" in tipe:
-        return f"Buatkan draf surat izin penelitian formal nama {n} judul {t}."
-    elif "Instrumen" in tipe:
-        return f"Buatkan instrumen penelitian {m} untuk judul {t}."
-    elif c:
-        return f"Revisi {tipe} skripsi {m} judul {t} berdasarkan: {c}. {instruksi_pustaka}. Gunakan kutipan dan Daftar Pustaka APA 7th Edition."
+    if "Bab 1" in tipe:
+        instruksi_khusus = f"""
+        Dalam Latar Belakang, susun data fenomena secara mengerucut (Piramida Terbalik):
+        1. Mulai dari data/masalah di tingkat Provinsi/Nasional terkait {t}.
+        2. Masuk ke data di tingkat Kabupaten/Kota ({kota}).
+        3. Masuk ke fenomena nyata di lokasi penelitian ({lok}).
+        4. Berikan argumen mengapa penelitian ini mendesak dilakukan di lokasi tersebut.
+        """
     else:
-        return f"Buatkan draf {tipe} skripsi {m} judul {t}. {instruksi_pustaka}. WAJIB gunakan kutipan di teks dan sertakan Daftar Pustaka (Gabungan referensi lama dan baru) di akhir."
+        instruksi_khusus = f"Kerjakan {tipe} dengan fokus pada lokasi {lok}."
+
+    if c:
+        return f"Revisi {tipe} skripsi {m} judul {t} di {lok} berdasarkan: {c}. {instruksi_pustaka}. Gunakan kutipan APA 7th."
+    else:
+        return f"Buatkan draf {tipe} skripsi {m} judul {t}. {instruksi_khusus}. {instruksi_pustaka}. WAJIB gunakan kutipan dan Daftar Pustaka APA 7th."
 
 with tab_buat:
     if st.button("🚀 Generate / Update Draf"):
-        if topik and nama_user:
-            with st.spinner(f"Menyusun {bab_pilihan} (Sinkronisasi Pustaka)..."):
+        if topik and nama_user and lokasi_penelitian:
+            with st.spinner(f"Menyusun {bab_pilihan} (Menganalisis data fenomena)..."):
                 try:
-                    p = dapatkan_prompt_kumulatif(bab_pilihan, topik, nama_user, metode, st.session_state['pustaka_koleksi'])
+                    p = dapatkan_prompt_fenomena(bab_pilihan, topik, nama_user, metode, lokasi_penelitian, kab_prov, st.session_state['pustaka_koleksi'])
                     res = model.generate_content(p)
                     st.session_state['db'][bab_pilihan] = res.text
-                    
-                    # Ambil bagian Daftar Pustaka dari hasil untuk disimpan ke memori
                     if "DAFTAR PUSTAKA" in res.text.upper():
-                        parts = res.text.upper().split("DAFTAR PUSTAKA")
-                        st.session_state['pustaka_koleksi'] = parts[-1]
-                    
+                        st.session_state['pustaka_koleksi'] = res.text.upper().split("DAFTAR PUSTAKA")[-1]
                     st.rerun()
                 except Exception as e: st.error(f"Gagal: {e}")
-        else: st.warning("Isi Nama & Judul!")
+        else: st.warning("Pastikan Nama, Judul, dan Lokasi Penelitian sudah diisi!")
 
 with tab_revisi:
     catatan = st.text_area("✍️ Catatan Revisi Dosen:")
     if st.button("Proses Revisi 🚀"):
         if catatan and topik:
-            with st.spinner("Merevisi & Sinkron Pustaka..."):
+            with st.spinner("Merevisi draf..."):
                 try:
-                    p = dapatkan_prompt_kumulatif(bab_pilihan, topik, nama_user, metode, st.session_state['pustaka_koleksi'], catatan)
+                    p = dapatkan_prompt_fenomena(bab_pilihan, topik, nama_user, metode, lokasi_penelitian, kab_prov, st.session_state['pustaka_koleksi'], catatan)
                     res = model.generate_content(p)
                     st.session_state['db'][bab_pilihan] = res.text
                     st.rerun()
