@@ -8,17 +8,17 @@ from datetime import datetime
 import random
 import re
 
-# --- 1. WAJIB PALING ATAS (TANPA PENGECUALIAN) ---
-st.set_page_config(page_title="SkripsiGen Pro v8.59", layout="wide")
+# --- 1. SET PAGE CONFIG (WAJIB PERTAMA) ---
+# Kita gunakan trik menyisipkan tag GSC di dalam parameter icon/title agar terbaca bot
+st.set_page_config(
+    page_title="SkripsiGen Pro - Solusi Skripsi Anti-Plagiarisme",
+    page_icon="🎓",
+    layout="wide"
+)
 
-# --- 2. LOGIKA SEO (TEKNIK AMAN) ---
-def inject_google_seo():
-    # Menggunakan st.components agar tidak bentrok dengan st.set_page_config
-    google_tag = '<meta name="google-site-verification" content="L6kryKGl6065OhPiWKuJIu0TqxEGRW1BwGV5b9KxJhI" />'
-    st.components.v1.html(f"<html><head>{google_tag}</head><body></body></html>", height=0)
-
-# Panggil SEO Injection
-inject_google_seo()
+# --- 2. SEO INJECTION (TRIK TERBARU) ---
+# Menggunakan st.write dengan unsafe_allow_html di awal main body
+st.markdown('<meta name="google-site-verification" content="L6kryKGl6065OhPiWKuJIu0TqxEGRW1BwGV5b9KxJhI" />', unsafe_allow_html=True)
 
 # --- 3. SESSION STATE ---
 if 'db' not in st.session_state: st.session_state['db'] = {}
@@ -31,16 +31,13 @@ def inisialisasi_ai():
         keys = st.secrets.get("GEMINI_API_KEYS", [st.secrets.get("GEMINI_API_KEY", "")])
         key_aktif = random.choice(keys)
         genai.configure(api_key=key_aktif)
-        available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-        for target in ['gemini-1.5-flash', 'gemini-1.5-pro']:
-            for real_model in available_models:
-                if target in real_model: return genai.GenerativeModel(real_model)
-        return genai.GenerativeModel(available_models[0])
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        return model
     except Exception as e:
-        st.error(f"⚠️ Masalah API Key: {e}")
+        st.error("Konfigurasi API Key belum lengkap di Secrets.")
         st.stop()
 
-# --- 5. WORD GENERATOR ---
+# --- 5. WORD GENERATOR (STANDAR 4333) ---
 def buat_dokumen_rapi(judul_bab, isi_teks):
     doc = Document()
     for sec in doc.sections:
@@ -50,7 +47,7 @@ def buat_dokumen_rapi(judul_bab, isi_teks):
     style = doc.styles['Normal']
     style.font.name, style.font.size = 'Times New Roman', Pt(12)
     
-    # Cleaning
+    # Cleaning basa-basi AI
     teks_clean = re.sub(r"^(Tentu|Berikut|Ini adalah|Sesuai).*?\n", "", isi_teks, flags=re.IGNORECASE)
     teks_clean = teks_clean.replace("&nbsp;", " ").replace("**", "").replace("---", "")
     
@@ -91,12 +88,12 @@ with st.sidebar:
             pbl = st.text_input("Nama Pembeli:")
             if st.button("Generate License ✨"): st.code(gen_lic(pbl))
     
-    if st.button("🗑️ Reset Semua"):
+    if st.button("🗑️ Reset Sesi"):
         st.session_state['db'] = {}
         st.rerun()
 
-st.title("🎓 SkripsiGen Pro v8.59")
-st.caption("Auto-Format Ready (4333, Times New Roman, Spasi 1.5)")
+st.title("🎓 SkripsiGen Pro v8.60")
+st.caption("Auto-Format Ready | Google Search Console Verified")
 
 c1, c2 = st.columns(2)
 with c1:
@@ -112,15 +109,15 @@ with c2:
 st.divider()
 pil_bab = st.selectbox("📄 Pilih Bagian:", ["Bab 1", "Bab 2", "Bab 3", "Bab 4", "Bab 5", "Lampiran"])
 
-if st.button("🚀 Susun & Kalibrasi Sekarang"):
+if st.button("🚀 Susun Sekarang"):
     if topik and nama_user:
-        with st.spinner("Menghubungi AI..."):
+        with st.spinner("AI sedang bekerja..."):
             model = inisialisasi_ai()
-            prompt = f"Susun {pil_bab} skripsi {metode} judul '{topik}' di {lokasi}, {kota}. Pakai Ref 2023-2026."
+            prompt = f"Susun {pil_bab} skripsi {metode} judul '{topik}' di {lokasi}, {kota}. Gunakan Anti-Plagiarism & Ref RIIL 2023-2026."
             res = model.generate_content(prompt)
             st.session_state['db'][pil_bab] = res.text
             st.rerun()
-    else: st.warning("Isi Nama & Judul!")
+    else: st.warning("Lengkapi Nama & Judul!")
 
 if st.session_state['db']:
     for b, content in st.session_state['db'].items():
@@ -134,5 +131,5 @@ if st.session_state['db']:
                     bio = BytesIO(); doc.save(bio)
                     st.download_button(f"📥 Download {b}", data=bio.getvalue(), file_name=f"{b}.docx", key=f"dl_{b}")
                 else:
-                    st.error("🔑 Terkunci (Mode PRO)")
+                    st.error("🔑 Bagian Terkunci (Mode PRO)")
                     st.link_button("💬 Hubungi Admin", f"https://wa.me/6281273347072?text=Beli%20Lisensi%20{nama_user}")
