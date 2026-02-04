@@ -6,7 +6,7 @@ from datetime import datetime
 import random
 import time
 
-# --- 1. KONEKSI MULTI-KEY ---
+# --- 1. KONEKSI API ---
 ALL_KEYS = st.secrets.get("GEMINI_API_KEYS", [st.secrets.get("GEMINI_API_KEY", "")])
 
 def inisialisasi_ai():
@@ -20,26 +20,26 @@ def inisialisasi_ai():
         return genai.GenerativeModel(available_models[0])
     except: return genai.GenerativeModel('gemini-1.5-flash')
 
-# --- 2. LOGIKA LISENSI ---
-def gen_lic(n):
-    d = datetime.now().strftime("%d%m")
-    nm = n.split(' ')[0].upper() if n else "USER"
-    return f"PRO-{nm}-{d}-SKR"
-
 if 'db' not in st.session_state: st.session_state['db'] = {}
 
-# --- 3. UI SETUP ---
-st.set_page_config(page_title="SkripsiGen Pro v8.32", layout="wide")
+# --- 2. UI SETUP ---
+st.set_page_config(page_title="SkripsiGen Pro v8.34", layout="wide")
 
 with st.sidebar:
     st.header("🛡️ Pusat Kalibrasi")
-    st.success("✅ Mode: Anti-Plagiasi & Revisi Dosen")
-    st.info("Input catatan dosen di setiap bab untuk revisi otomatis.")
+    st.success("✅ Lampiran & Instrumen Ready")
+    st.info("Pilih 'Lampiran' untuk mendapatkan Surat Izin & Kuesioner Lapangan.")
     
     st.divider()
     nama_user = st.text_input("👤 Nama Mahasiswa:", placeholder="Contoh: Beny")
     user_lic = st.text_input("🔑 Kode Lisensi:", type="password")
     
+    # --- LOGIKA LISENSI ---
+    def gen_lic(n):
+        d = datetime.now().strftime("%d%m")
+        nm = n.split(' ')[0].upper() if n else "USER"
+        return f"PRO-{nm}-{d}-SKR"
+
     st.divider()
     with st.expander("🛠️ MENU OWNER"):
         pw = st.text_input("Admin Pass:", type="password")
@@ -47,76 +47,75 @@ with st.sidebar:
             pbl = st.text_input("Nama Pembeli:")
             if st.button("Generate ✨"): st.code(gen_lic(pbl))
 
-# --- 4. MAIN CONTENT ---
-st.title("🎓 SkripsiGen Pro v8.32")
-st.caption(f"Status: Pro Feature Enabled | Fitur Revisi Dosen Aktif")
+# --- 3. MAIN CONTENT ---
+st.title("🎓 SkripsiGen Pro v8.34")
+st.caption(f"Status: Full Toolkit Active | Jalur: Multi-Key")
 
 c1, c2 = st.columns(2)
 with c1:
-    topik = st.text_input("📝 Judul Skripsi:", placeholder="Contoh: Analisis Kinerja...")
-    lokasi = st.text_input("📍 Lokasi:", placeholder="Contoh: PT. Maju")
+    topik = st.text_input("📝 Judul Skripsi:", placeholder="Contoh: Analisis Pengetahuan...")
+    lokasi = st.text_input("📍 Lokasi:", value="SMK PGRI 1 Kabupaten Lahat")
 with c2:
-    kota = st.text_input("🏙️ Kota:", placeholder="Contoh: Jakarta")
+    kota = st.text_input("🏙️ Kota:", value="Lahat")
     metode = st.selectbox("🔬 Metode:", ["Kuantitatif", "Kualitatif", "R&D"])
 
 st.divider()
-pil_bab = st.selectbox("📄 Pilih Bagian:", ["Bab 1", "Bab 2", "Bab 3", "Bab 4", "Bab 5", "Lampiran"])
+# Penambahan opsi Lampiran secara spesifik
+pil_bab = st.selectbox("📄 Pilih Bagian:", [
+    "Bab 1", "Bab 2", "Bab 3", "Bab 4", "Bab 5", 
+    "Lampiran: Surat Izin & Instrumen Lapangan"
+])
 
-# --- FUNGSI GENERATE (DENGAN CATATAN DOSEN) ---
-def jalankan_proses(mode="Normal", target_bab=None, catatan_dosen=""):
+def jalankan_proses(target_bab=None, catatan_dosen=""):
     bab_yg_diproses = target_bab if target_bab else pil_bab
     if topik and nama_user:
         placeholder = st.empty()
         for i in range(3):
             try:
                 with placeholder.container():
-                    st.spinner(f"Sedang memproses revisi {bab_yg_diproses}...")
+                    st.spinner(f"Menyusun {bab_yg_diproses}...")
                     model = inisialisasi_ai()
                     
-                    # Tambahkan ocehan dosen ke dalam prompt
-                    inst_dosen = f"REVISI BERDASARKAN CATATAN DOSEN: {catatan_dosen}" if catatan_dosen else ""
+                    # PROMPT KHUSUS LAMPIRAN VS BAB BIASA
+                    if "Lampiran" in bab_yg_diproses:
+                        prompt = f"""
+                        Buatkan dokumen LAMPIRAN PENELITIAN untuk mahasiswa bernama {nama_user} dengan judul '{topik}' di {lokasi}.
+                        Isi harus mencakup:
+                        1. DRAFT SURAT PERMOHONAN IZIN OBSERVASI: Kepada Kepala Sekolah {lokasi}.
+                        2. PEDOMAN WAWANCARA: Untuk Guru BK guna validasi data perilaku siswa.
+                        3. KUESIONER PENELITIAN (SIAP PAKAI): Bagian Pengetahuan, Sikap, dan Tindakan (Skala Likert/Guttman).
+                        4. Format profesional, rapi, dan siap cetak.
+                        """
+                    else:
+                        inst_dosen = f"REVISI BERDASARKAN: {catatan_dosen}" if catatan_dosen else ""
+                        prompt = f"Susun draf {bab_yg_diproses} skripsi {metode} judul '{topik}' di {lokasi}, {kota}. {inst_dosen}. Gunakan Referensi RIIL 2023-2026, APA 7th, dan Laporan Audit di akhir."
                     
-                    prompt = f"""
-                    Susun draf {bab_yg_diproses} skripsi {metode} judul '{topik}' di {lokasi}, {kota}.
-                    {inst_dosen}
-                    WAJIB: Referensi RIIL 2023-2026, APA 7th, Bedah Variabel, dan Deep Paraphrase.
-                    Laporan Audit di akhir draf.
-                    """
                     res = model.generate_content(prompt)
                     st.session_state['db'][bab_yg_diproses] = res.text
                     st.rerun()
                     break
-            except Exception as e:
-                if "429" in str(e):
-                    st.warning("Jalur sibuk, sistem mencari celah (5 detik)...")
-                    time.sleep(5)
-                else:
-                    st.error(f"Error: {e}"); break
+            except:
+                time.sleep(5)
     else: st.warning("Isi Nama & Judul!")
 
-if st.button("🚀 Susun Draf Awal"):
+if st.button("🚀 Susun Draf / Lampiran"):
     jalankan_proses()
 
-# --- 5. BOX OUTPUT (TEMPAT INPUT OCEHAN DOSEN) ---
+# --- 4. BOX OUTPUT ---
 if st.session_state['db']:
-    st.divider()
     for b, content in st.session_state['db'].items():
         with st.container(border=True):
             st.markdown(f"### 📄 {b}")
             
-            # Kolom Input Ocehan Dosen
-            catatan = st.text_area(f"✍️ Catatan/Ocehan Dosen untuk {b}:", placeholder="Contoh: Tambahkan teori menurut Sugiyono (2024)...", key=f"input_{b}")
-            
-            col1, col2 = st.columns([1, 4])
-            with col1:
-                if st.button(f"🔄 Revisi {b}", key=f"btn_{b}"):
-                    jalankan_proses(mode="Revision", target_bab=b, catatan_dosen=catatan)
-            with col2:
-                if st.button("🗑️ Hapus Bab", key=f"del_{b}"):
-                    del st.session_state['db'][b]; st.rerun()
+            # Input untuk Ocehan Dosen jika bukan lampiran
+            if "Lampiran" not in b:
+                catatan = st.text_area(f"✍️ Catatan Dosen untuk {b}:", key=f"in_{b}")
+                col1, col2 = st.columns([1, 4])
+                if col1.button(f"🔄 Revisi {b}", key=f"btn_{b}"):
+                    jalankan_proses(target_bab=b, catatan_dosen=catatan)
             
             st.markdown(content[:400] + "...")
-            with st.expander("Buka Draf Lengkap"):
+            with st.expander("Buka Dokumen Lengkap"):
                 st.markdown(content)
                 if user_lic == gen_lic(nama_user):
                     doc = Document()
