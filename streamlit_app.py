@@ -29,13 +29,12 @@ def gen_lic(n):
 if 'db' not in st.session_state: st.session_state['db'] = {}
 
 # --- 3. UI SETUP ---
-st.set_page_config(page_title="SkripsiGen Pro v8.31", layout="wide")
+st.set_page_config(page_title="SkripsiGen Pro v8.32", layout="wide")
 
 with st.sidebar:
     st.header("🛡️ Pusat Kalibrasi")
-    st.success("✅ Engine: Anti-Plagiarism Mode")
-    st.success("✅ Mode: Deep Academic Paraphrase")
-    st.info("Fitur Revisi & Auto-Retry Aktif.")
+    st.success("✅ Mode: Anti-Plagiasi & Revisi Dosen")
+    st.info("Input catatan dosen di setiap bab untuk revisi otomatis.")
     
     st.divider()
     nama_user = st.text_input("👤 Nama Mahasiswa:", placeholder="Contoh: Beny")
@@ -49,8 +48,8 @@ with st.sidebar:
             if st.button("Generate ✨"): st.code(gen_lic(pbl))
 
 # --- 4. MAIN CONTENT ---
-st.title("🎓 SkripsiGen Pro v8.31")
-st.caption(f"Status: Full Feature Active | Jalur: Multi-Key Ready")
+st.title("🎓 SkripsiGen Pro v8.32")
+st.caption(f"Status: Pro Feature Enabled | Fitur Revisi Dosen Aktif")
 
 c1, c2 = st.columns(2)
 with c1:
@@ -63,32 +62,25 @@ with c2:
 st.divider()
 pil_bab = st.selectbox("📄 Pilih Bagian:", ["Bab 1", "Bab 2", "Bab 3", "Bab 4", "Bab 5", "Lampiran"])
 
-# --- FUNGSI GENERATE (DENGAN REVISI & AUTO-RETRY) ---
-def jalankan_proses(mode="Normal", target_bab=None):
+# --- FUNGSI GENERATE (DENGAN CATATAN DOSEN) ---
+def jalankan_proses(mode="Normal", target_bab=None, catatan_dosen=""):
     bab_yg_diproses = target_bab if target_bab else pil_bab
     if topik and nama_user:
         placeholder = st.empty()
-        for i in range(3): # Coba 3 kali jika sibuk
+        for i in range(3):
             try:
                 with placeholder.container():
-                    st.spinner(f"Sedang mengaudit {bab_yg_diproses} (Percobaan {i+1})...")
+                    st.spinner(f"Sedang memproses revisi {bab_yg_diproses}...")
                     model = inisialisasi_ai()
                     
-                    # Tambahan instruksi jika mode Re-Kalibrasi (Revisi)
-                    mod_inst = "REVISI: Lakukan parafrase total dengan sudut pandang berbeda dari sebelumnya." if mode == "Re-Calibrate" else ""
+                    # Tambahkan ocehan dosen ke dalam prompt
+                    inst_dosen = f"REVISI BERDASARKAN CATATAN DOSEN: {catatan_dosen}" if catatan_dosen else ""
                     
                     prompt = f"""
                     Susun draf {bab_yg_diproses} skripsi {metode} judul '{topik}' di {lokasi}, {kota}.
-                    {mod_inst}
+                    {inst_dosen}
                     WAJIB: Referensi RIIL 2023-2026, APA 7th, Bedah Variabel, dan Deep Paraphrase.
-                    
-                    LAPORAN AUDIT DI AKHIR:
-                    ---
-                    ### 🛠️ SERTIFIKAT KALIBRASI INTERNAL (v8.31)
-                    - **Status Sumber**: TERVERIFIKASI RIIL (2023-2026)
-                    - **Orisinalitas**: > 95% (Unique Structure)
-                    - **Mode**: {mode} Calibration
-                    ---
+                    Laporan Audit di akhir draf.
                     """
                     res = model.generate_content(prompt)
                     st.session_state['db'][bab_yg_diproses] = res.text
@@ -102,30 +94,33 @@ def jalankan_proses(mode="Normal", target_bab=None):
                     st.error(f"Error: {e}"); break
     else: st.warning("Isi Nama & Judul!")
 
-if st.button("🚀 Susun Draf & Kalibrasi"):
+if st.button("🚀 Susun Draf Awal"):
     jalankan_proses()
 
-# --- 5. BOX OUTPUT (FITUR REVISI ADA DI SINI) ---
+# --- 5. BOX OUTPUT (TEMPAT INPUT OCEHAN DOSEN) ---
 if st.session_state['db']:
     st.divider()
     for b, content in st.session_state['db'].items():
         with st.container(border=True):
-            col1, col2, col3 = st.columns([4, 1.2, 0.8])
-            col1.markdown(f"### 📄 {b}")
+            st.markdown(f"### 📄 {b}")
             
-            # FITUR RE-KALIBRASI (REVISI)
-            if col2.button(f"🔄 Re-Kalibrasi", key=f"re_{b}"):
-                jalankan_proses(mode="Re-Calibrate", target_bab=b)
-                
-            if col3.button("🗑️ Hapus", key=f"del_{b}"):
-                del st.session_state['db'][b]; st.rerun()
+            # Kolom Input Ocehan Dosen
+            catatan = st.text_area(f"✍️ Catatan/Ocehan Dosen untuk {b}:", placeholder="Contoh: Tambahkan teori menurut Sugiyono (2024)...", key=f"input_{b}")
+            
+            col1, col2 = st.columns([1, 4])
+            with col1:
+                if st.button(f"🔄 Revisi {b}", key=f"btn_{b}"):
+                    jalankan_proses(mode="Revision", target_bab=b, catatan_dosen=catatan)
+            with col2:
+                if st.button("🗑️ Hapus Bab", key=f"del_{b}"):
+                    del st.session_state['db'][b]; st.rerun()
             
             st.markdown(content[:400] + "...")
-            with st.expander("Buka Draf & Sertifikat Audit"):
+            with st.expander("Buka Draf Lengkap"):
                 st.markdown(content)
                 if user_lic == gen_lic(nama_user):
                     doc = Document()
                     doc.add_heading(b, 0); doc.add_paragraph(content)
                     bio = BytesIO(); doc.save(bio)
                     st.download_button(f"📥 Download Word", data=bio.getvalue(), file_name=f"{b}.docx", key=f"d_{b}")
-                else: st.warning("Masukkan lisensi untuk download.")
+                else: st.warning("Gunakan lisensi untuk download.")
