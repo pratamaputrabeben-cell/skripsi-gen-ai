@@ -16,7 +16,7 @@ if st.query_params.get("google") == "1":
     st.stop()
 
 # --- 2. CONFIG HALAMAN ---
-st.set_page_config(page_title="SkripsiGen Pro v8.73", page_icon="🎓", layout="wide")
+st.set_page_config(page_title="SkripsiGen Pro v8.74", page_icon="🎓", layout="wide")
 
 # --- 3. SESSION STATE ---
 if 'db' not in st.session_state: st.session_state['db'] = {}
@@ -25,32 +25,26 @@ if 'user_data' not in st.session_state:
         "topik": "", "lokasi": "SMK Negeri 2 Kabupaten Lahat", "kota": "Lahat", "nama": ""
     }
 
-# --- 4. ENGINE SETUP (MODIFIED FOR 404 ERROR) ---
+# --- 4. ENGINE SETUP (SMART DISCOVERY - ANTI 404) ---
 def inisialisasi_ai():
     try:
         keys = st.secrets.get("GEMINI_API_KEYS", [st.secrets.get("GEMINI_API_KEY", "")])
         key_aktif = random.choice(keys)
         genai.configure(api_key=key_aktif)
         
-        # Daftar model terbaru 2026 yang paling stabil
-        # Kita pakai versi 'models/' lengkap agar tidak 404
-        model_options = [
-            'gemini-1.5-flash-latest', 
-            'gemini-1.5-pro-latest',
-            'models/gemini-1.5-flash',
-            'models/gemini-1.5-pro'
-        ]
+        # Minta daftar model yang benar-benar ada di akun Bos Beben
+        available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
         
-        for m in model_options:
-            try:
-                model = genai.GenerativeModel(model_name=m)
-                # Tes koneksi ringan
-                return model
-            except:
-                continue
+        # Urutan prioritas model terbaik
+        targets = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro']
         
-        # Jika semua gagal, pakai default yang paling umum
-        return genai.GenerativeModel('gemini-pro')
+        for target in targets:
+            for real_model in available_models:
+                if target in real_model:
+                    return genai.GenerativeModel(real_model)
+        
+        # Kalau tidak ketemu yang favorit, pakai apa saja yang ada
+        return genai.GenerativeModel(available_models[0])
     except Exception as e:
         st.error(f"Koneksi API Gagal: {e}")
         st.stop()
@@ -79,8 +73,8 @@ with st.sidebar:
         st.rerun()
 
 # --- 6. TAMPILAN UTAMA ---
-st.title("🎓 SkripsiGen Pro v8.73")
-st.caption("Standard: Academic Formatting 4-3-3-3 | Multi-Model Fallback Active")
+st.title("🎓 SkripsiGen Pro v8.74")
+st.caption("Auto-Discovery Model Active | Anti-404 System")
 
 c1, c2 = st.columns(2)
 with c1:
@@ -95,16 +89,15 @@ bab = st.selectbox("📄 Pilih Bagian:", ["Bab 1", "Bab 2", "Bab 3", "Bab 4", "B
 
 if st.button("🚀 Susun Sekarang"):
     if st.session_state['user_data']['topik'] and nama_user:
-        with st.spinner("Menghubungi Server Google..."):
+        with st.spinner("Mencari Model AI yang aktif..."):
             try:
                 model = inisialisasi_ai()
-                prompt = f"Susun {bab} skripsi {metode} judul '{st.session_state['user_data']['topik']}' di {st.session_state['user_data']['lokasi']}, {st.session_state['user_data']['kota']}. Gunakan format akademik."
+                prompt = f"Susun {bab} skripsi {metode} judul '{st.session_state['user_data']['topik']}' di {st.session_state['user_data']['lokasi']}, {st.session_state['user_data']['kota']}. Pakai format akademik."
                 res = model.generate_content(prompt)
-                if res.text:
-                    st.session_state['db'][bab] = res.text
-                    st.rerun()
+                st.session_state['db'][bab] = res.text
+                st.rerun()
             except Exception as e:
-                st.error(f"Server sibuk: {e}. Coba klik lagi, Bos!")
+                st.error(f"Google Error: {e}")
     else: st.warning("Isi Nama & Judul!")
 
 # --- 7. OUTPUT BOX ---
@@ -116,7 +109,7 @@ if st.session_state['db']:
             with st.expander("Buka Draf"):
                 st.markdown(content)
                 if b in ["Bab 1", "Bab 2"] or is_pro:
-                    st.success("Draf aman, siap salin ke Word.")
+                    st.success("Draf aman, siap salin.")
                 else:
                     st.error("🔑 Bagian ini terkunci (Mode PRO)")
                     p_wa = f"Halo Admin, saya {nama_user} mau beli lisensi PRO."
