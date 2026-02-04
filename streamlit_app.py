@@ -8,8 +8,7 @@ from datetime import datetime
 import random
 import re
 
-# --- 1. SEO BYPASS (WAJIB PERTAMA) ---
-# Trik Meta Tag agar Google Search Console bisa baca kodenya
+# --- 1. SEO BYPASS (UNTUK GOOGLE SEARCH CONSOLE) ---
 st.markdown('<meta name="google-site-verification" content="L6kryKGl6065OhPiWKuJIu0TqxEGRW1BwGV5b9KxJhI" />', unsafe_allow_html=True)
 
 if st.query_params.get("google") == "1":
@@ -17,7 +16,7 @@ if st.query_params.get("google") == "1":
     st.stop()
 
 # --- 2. CONFIG HALAMAN ---
-st.set_page_config(page_title="SkripsiGen Pro v8.67", page_icon="🎓", layout="wide")
+st.set_page_config(page_title="SkripsiGen Pro v8.68", page_icon="🎓", layout="wide")
 
 # --- 3. DATABASE & SESSION ---
 if 'db' not in st.session_state: st.session_state['db'] = {}
@@ -36,13 +35,12 @@ def inisialisasi_ai():
         genai.configure(api_key=random.choice(keys))
         return genai.GenerativeModel('gemini-1.5-flash')
     except:
-        st.error("⚠️ Cek API Key di Secrets Dashboard Streamlit!")
+        st.error("⚠️ API Key belum disetting di Secrets Streamlit!")
         st.stop()
 
 # --- 5. TAMPILAN SIDEBAR ---
 with st.sidebar:
     st.header("🛡️ Pusat Kalibrasi")
-    st.info("SEO Tag & Auto-Format: ACTIVE")
     nama_user = st.text_input("👤 Nama Mahasiswa:", value=st.session_state['user_data']['nama'])
     st.session_state['user_data']['nama'] = nama_user
     user_lic = st.text_input("🔑 Kode Lisensi PRO:", type="password")
@@ -55,45 +53,43 @@ with st.sidebar:
         st.session_state['db'] = {}
         st.rerun()
 
-# --- 6. TAMPILAN UTAMA & INPUT LOKASI ---
-st.title("🎓 SkripsiGen Pro v8.67")
+# --- 6. TAMPILAN UTAMA ---
+st.title("🎓 SkripsiGen Pro v8.68")
 st.caption("Standard: Academic Formatting 4-3-3-3 | Verified by Google")
 
 c1, c2 = st.columns(2)
 with c1:
     st.session_state['user_data']['topik'] = st.text_input("📝 Judul Skripsi:", value=st.session_state['user_data']['topik'])
-    # KEMBALI: Input Lokasi & Instansi
-    st.session_state['user_data']['lokasi'] = st.text_input("📍 Lokasi (Contoh: SMK Negeri 2):", value=st.session_state['user_data']['lokasi'])
+    st.session_state['user_data']['lokasi'] = st.text_input("📍 Instansi/Sekolah:", value=st.session_state['user_data']['lokasi'])
 with c2:
-    # KEMBALI: Input Kota/Provinsi
     st.session_state['user_data']['kota'] = st.text_input("🏙️ Kota/Provinsi:", value=st.session_state['user_data']['kota'])
     metode = st.selectbox("🔬 Metode Penelitian:", ["Kuantitatif", "Kualitatif", "R&D"])
 
 st.divider()
-pil_bab = st.selectbox("📄 Pilih Bagian:", ["Bab 1", "Bab 2", "Bab 3", "Bab 4", "Bab 5", "Lampiran"])
+pil_bab = st.selectbox("📄 Pilih Bagian:", ["Bab 1", "Bab 2", "Bab 3", "Bab 4", "Bab 5"])
 
-if st.button("🚀 Susun & Kalibrasi Sekarang"):
+if st.button("🚀 Susun Sekarang"):
     if st.session_state['user_data']['topik'] and nama_user:
-        with st.spinner("AI sedang merangkai draf..."):
+        with st.spinner("AI sedang menyusun..."):
             model = inisialisasi_ai()
-            prompt = f"""Susun {pil_bab} skripsi {metode} dengan judul '{st.session_state['user_data']['topik']}' 
-            berlokasi di {st.session_state['user_data']['lokasi']}, {st.session_state['user_data']['kota']}. 
-            Gunakan referensi riil tahun 2023-2026 dan anti-plagiarisme."""
+            prompt = f"Susun {pil_bab} skripsi {metode} judul '{st.session_state['user_data']['topik']}' di {st.session_state['user_data']['lokasi']}, {st.session_state['user_data']['kota']}."
             res = model.generate_content(prompt)
             st.session_state['db'][pil_bab] = res.text
             st.rerun()
     else: st.warning("Nama & Judul wajib diisi!")
 
-# Output & Download
+# --- 7. OUTPUT BOX ---
 if st.session_state['db']:
     for b, content in st.session_state['db'].items():
         with st.container(border=True):
             st.markdown(f"### 📄 {b}")
-            is_trial, is_pro = b in ["Bab 1", "Bab 2"], user_lic == gen_lic(nama_user)
+            is_pro = user_lic == gen_lic(nama_user)
             with st.expander("Buka Draf"):
                 st.markdown(content)
-                if is_trial or is_pro:
-                    st.success("Format 4-3-3-3 Siap!")
+                if b in ["Bab 1", "Bab 2"] or is_pro:
+                    st.success("Draf siap dipindahkan ke Word!")
                 else:
-                    st.error("🔑 Terkunci (Mode PRO)")
-                    st.link_button("💬 Hubungi Admin
+                    st.error("🔑 Bagian ini terkunci (Mode PRO)")
+                    # FIXED: Tanda kutip sudah ditutup dengan benar
+                    wa_link = f"https://wa.me/6281273347072?text=Beli%20Lisensi%20{nama_user}"
+                    st.link_button("💬 Hubungi Admin untuk Lisensi", wa_link)
