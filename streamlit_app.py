@@ -4,22 +4,26 @@ from docx import Document
 from io import BytesIO
 from datetime import datetime
 
-# --- 1. KONFIGURASI API (JALUR STABIL) ---
+# --- 1. KONFIGURASI API (SMART AUTO-DETECTION) ---
 try:
     api_key = st.secrets["GEMINI_API_KEY"]
-    # Inisialisasi Google AI dengan versi stabil
     genai.configure(api_key=api_key)
     
-    # Mencari model yang tersedia secara otomatis di akun Anda
-    # Prioritas: 1.5-flash (Gratis & Cepat), lalu 1.5-pro
-    def inisialisasi_model():
+    # Fungsi mencari model yang didukung secara otomatis
+    def dapatkan_model_tersedia():
         try:
-            # Gunakan penamaan model tanpa embel-embel beta
-            return genai.GenerativeModel('models/gemini-1.5-flash')
+            # Cek daftar model yang support generateContent
+            for m in genai.list_models():
+                if 'generateContent' in m.supported_generation_methods:
+                    # Prioritaskan Flash jika ada, kalau tidak ambil apa saja yang aktif
+                    if '1.5-flash' in m.name: return m.name
+            # Fallback jika tidak ditemukan spesifik
+            return 'models/gemini-1.5-flash'
         except:
-            return genai.GenerativeModel('models/gemini-pro')
+            return 'gemini-pro' # Emergency fallback
 
-    model = inisialisasi_model()
+    nama_model = dapatkan_model_tersedia()
+    model = genai.GenerativeModel(nama_model)
 except Exception as e:
     st.error(f"Koneksi API Gagal: {e}"); st.stop()
 
@@ -33,7 +37,7 @@ def gen_lic(n):
 if 'db' not in st.session_state: st.session_state['db'] = {}
 
 # --- 4. UI SETUP ---
-st.set_page_config(page_title="SkripsiGen Pro v8.17", layout="wide")
+st.set_page_config(page_title="SkripsiGen Pro v8.18", layout="wide")
 
 with st.sidebar:
     st.header("🔓 Aktivasi & Menu")
@@ -42,7 +46,7 @@ with st.sidebar:
     
     st.divider()
     st.write("🔍 **Cek Jurnal Riil**")
-    cj = st.text_input("Judul/DOI:", placeholder="Salin judul ke sini...")
+    cj = st.text_input("Salin Judul/DOI:", placeholder="Cek keaslian...")
     if cj:
         st.link_button("Cek di Google Scholar", f"https://scholar.google.com/scholar?q={cj.replace(' ', '+')}")
 
@@ -55,13 +59,13 @@ with st.sidebar:
                 st.code(gen_lic(pbl))
 
 # --- 5. MAIN CONTENT ---
-st.title("🎓 SkripsiGen Pro v8.17")
-st.caption("Standard Akademik 2026 | Multi-Model Auto Detection")
+st.title("🎓 SkripsiGen Pro v8.18")
+st.caption(f"Model Aktif Otomatis: {nama_model} | Standard Akademik 2026")
 
 c1, c2 = st.columns(2)
 with c1:
-    topik = st.text_input("📝 Judul Skripsi:", placeholder="Contoh: Analisis Pengaruh...")
-    lokasi = st.text_input("📍 Lokasi:", placeholder="Contoh: PT. Maju Jaya")
+    topik = st.text_input("📝 Judul Skripsi:", placeholder="Contoh: Pengaruh Lingkungan Kerja...")
+    lokasi = st.text_input("📍 Lokasi:", placeholder="Contoh: PT. Maju Bersama")
 with c2:
     kota = st.text_input("🏙️ Kota:", placeholder="Contoh: Jakarta")
     metode = st.selectbox("🔬 Metode:", ["Kuantitatif", "Kualitatif", "R&D"])
@@ -72,26 +76,18 @@ pil_bab = st.selectbox("📄 Pilih Bagian:", ["Bab 1", "Bab 2", "Bab 3", "Bab 4"
 if st.button("🚀 Susun Draf Skripsi"):
     if topik and nama_user:
         with st.spinner("AI sedang meriset data dan menyusun draf..."):
-            prompt = f"""
-            Buatkan draf {pil_bab} skripsi {metode} dengan judul '{topik}' di {lokasi}.
-            PENTING:
-            1. Bedah variabel judul satu per satu.
-            2. Gunakan referensi ahli riil tahun 2023-2026.
-            3. Ikuti format sitasi APA 7th Edition.
-            4. Gunakan bahasa akademik formal.
-            """
+            prompt = f"Buatkan draf {pil_bab} skripsi {metode} dengan judul '{topik}' di {lokasi}. Bedah variabel judul, gunakan ahli riil 2023-2026, dan format APA 7th."
             try:
-                # Memanggil API
                 res = model.generate_content(prompt)
                 st.session_state['db'][pil_bab] = res.text
                 st.rerun()
             except Exception as e:
                 if "429" in str(e):
-                    st.error("⚠️ Server Antre! Mohon tunggu 60 detik lalu klik kembali.")
+                    st.error("⚠️ Server Antre! Mohon tunggu 60 detik.")
                 else:
                     st.error(f"Kendala Teknis: {e}")
     else:
-        st.warning("Silakan isi Nama dan Judul di sidebar/kolom!")
+        st.warning("Isi Nama & Judul dulu, Bos!")
 
 # --- 6. DOKUMEN BOX ---
 if st.session_state['db']:
@@ -114,4 +110,4 @@ if st.session_state['db']:
                     bio = BytesIO(); doc.save(bio)
                     st.download_button(f"📥 Download Word", data=bio.getvalue(), file_name=f"{b}.docx", key=f"d_{b}")
                 else:
-                    st.warning("⚠️ Masukkan kode lisensi di sidebar untuk download.")
+                    st.warning("⚠️ Gunakan lisensi untuk download.")
