@@ -4,26 +4,14 @@ from docx import Document
 from io import BytesIO
 from datetime import datetime
 
-# --- 1. KONFIGURASI API DENGAN AUTO-MODEL ---
+# --- 1. KONFIGURASI API (MODEL TERBARU & STABIL) ---
 try:
     api_key = st.secrets["GEMINI_API_KEY"]
     genai.configure(api_key=api_key)
     
-    # Fungsi otomatis mencari model yang aktif
-    def cari_model_aktif():
-        model_list = ["gemini-1.5-flash-latest", "gemini-1.5-pro-latest", "gemini-pro"]
-        for m_name in model_list:
-            try:
-                m = genai.GenerativeModel(m_name)
-                # Tes kecil untuk cek dukungan
-                m.generate_content("test", generation_config={"max_output_tokens": 1})
-                return m_name
-            except:
-                continue
-        return "gemini-pro" # Fallback terakhir
-
-    model_name = cari_model_aktif()
-    model = genai.GenerativeModel(model_name)
+    # Menggunakan model 1.5 flash yang paling didukung saat ini
+    # Jika masih error, coba ganti ke "gemini-1.5-flash" saja
+    model = genai.GenerativeModel('gemini-1.5-flash')
 except Exception as e:
     st.error(f"Koneksi API Gagal: {e}"); st.stop()
 
@@ -37,7 +25,7 @@ def gen_lic(n):
 if 'db' not in st.session_state: st.session_state['db'] = {}
 
 # --- 4. UI SETUP ---
-st.set_page_config(page_title="SkripsiGen Pro v8.15", layout="wide")
+st.set_page_config(page_title="SkripsiGen Pro v8.16", layout="wide")
 
 with st.sidebar:
     st.header("🔓 Aktivasi")
@@ -59,13 +47,13 @@ with st.sidebar:
                 st.code(gen_lic(pbl))
 
 # --- 5. MAIN CONTENT ---
-st.title("🎓 SkripsiGen Pro v8.15")
-st.caption(f"Model Aktif: {model_name} | Standard Akademik 2026")
+st.title("🎓 SkripsiGen Pro v8.16")
+st.caption("Edisi Anti-Error 404 | Standard Akademik 2026")
 
 c1, c2 = st.columns(2)
 with c1:
-    topik = st.text_input("📝 Judul Skripsi:", placeholder="Contoh: Pengaruh Lingkungan Kerja...")
-    lokasi = st.text_input("📍 Lokasi:", placeholder="Contoh: PT. Maju Bersama")
+    topik = st.text_input("📝 Judul Skripsi:", placeholder="Contoh: Pengaruh X terhadap Y...")
+    lokasi = st.text_input("📍 Lokasi:", placeholder="Contoh: PT. Maju Jaya")
 with c2:
     kota = st.text_input("🏙️ Kota:", placeholder="Contoh: Jakarta")
     metode = st.selectbox("🔬 Metode:", ["Kuantitatif", "Kualitatif", "R&D"])
@@ -76,16 +64,22 @@ pil_bab = st.selectbox("📄 Pilih Bagian:", ["Bab 1", "Bab 2", "Bab 3", "Bab 4"
 if st.button("🚀 Susun Draf Skripsi"):
     if topik and nama_user:
         with st.spinner("AI sedang menyusun draf akademik..."):
-            prompt = f"Buatkan draf {pil_bab} skripsi {metode} dengan judul '{topik}' di {lokasi}. Gunakan bedah variabel per kata, ahli riil tahun 2023-2026, dan format APA 7th."
+            # Prompt tetap mempertahankan fitur Bedah Variabel & Referensi Riil
+            prompt = f"""
+            Buatkan draf {pil_bab} skripsi {metode} dengan judul '{topik}' di {lokasi}.
+            Gunakan bedah variabel dari kata kunci judul, kutipan ahli riil tahun 2023-2026, 
+            dan format APA 7th Edition. Susun secara akademis dan formal.
+            """
             try:
-                res = model.generate_content(prompt).text
-                st.session_state['db'][pil_bab] = res
+                # Memanggil generate_content tanpa embel-embel versi API yang rumit
+                res = model.generate_content(prompt)
+                st.session_state['db'][pil_bab] = res.text
                 st.rerun()
             except Exception as e:
                 if "429" in str(e):
-                    st.error("⚠️ Kuota Gratis Habis. Tunggu 60 detik.")
+                    st.error("⚠️ Kuota Gratis Habis. Tunggu 60 detik ya, Bos.")
                 else:
-                    st.error(f"Kendala: {e}")
+                    st.error(f"Kendala Teknis: {e}")
     else:
         st.warning("Silakan isi Nama dan Judul!")
 
