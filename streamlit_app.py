@@ -15,11 +15,12 @@ st.set_page_config(
     layout="wide"
 )
 
-# --- 2. TRICK KHUSUS VERIFIKASI GOOGLE SEARCH CONSOLE ---
-# Menanamkan tag di Head (Markdown)
+# --- 2. GOOGLE SEARCH CONSOLE BYPASS (DOUBLE PROTECTION) ---
+# Metode A: HTML Tag (Meta)
 st.markdown('<meta name="google-site-verification" content="L6kryKGl6065OhPiWKuJIu0TqxEGRW1BwGV5b9KxJhI" />', unsafe_allow_html=True)
 
-# Pintu Rahasia untuk Verifikasi URL Parameter
+# Metode B: HTML File Simulation (URL Parameter)
+# Jika Google memanggil URL https://skripsi-gen-ai.streamlit.app/?google=1
 if "google" in st.query_params:
     st.write("google-site-verification: googleL6kryKGl6065OhPiWKuJIu0TqxEGRW1BwGV5b9KxJhI.html")
     st.stop()
@@ -31,8 +32,8 @@ if 'user_data' not in st.session_state:
 
 try:
     ALL_KEYS = st.secrets.get("GEMINI_API_KEYS", [st.secrets.get("GEMINI_API_KEY", "")])
-except Exception:
-    st.error("API Key belum disetting di Secrets Streamlit!")
+except:
+    st.error("⚠️ API Key belum diisi di Secrets Streamlit!")
     st.stop()
 
 def inisialisasi_ai():
@@ -46,7 +47,7 @@ def inisialisasi_ai():
         return genai.GenerativeModel(available_models[0])
     except: return genai.GenerativeModel('gemini-1.5-flash')
 
-# --- 4. FORMATTING ENGINE (Anti-Plagiarism & Word) ---
+# --- 4. FORMATTING ENGINE (Standar 4333) ---
 def bersihkan_dan_urutkan(teks):
     teks = re.sub(r"^(Tentu|Berikut|Ini adalah|Sesuai).*?\n", "", teks, flags=re.IGNORECASE)
     teks = teks.replace("&nbsp;", " ").replace("**", "").replace("---", "")
@@ -99,10 +100,10 @@ def buat_dokumen_rapi(judul_bab, isi_teks):
             fmt.line_spacing, fmt.left_indent, fmt.first_line_indent = 1.5, Inches(0.5), Inches(-0.5)
     return doc
 
-# --- 5. UI SIDEBAR ---
+# --- 5. SIDEBAR ---
 with st.sidebar:
     st.header("🛡️ Pusat Kalibrasi")
-    st.info("SEO & Auto-Format: ACTIVE")
+    st.info("Status: SEO Verified")
     nama_user = st.text_input("👤 Nama Mahasiswa:", value=st.session_state['user_data']['nama'])
     st.session_state['user_data']['nama'] = nama_user
     user_lic = st.text_input("🔑 Kode Lisensi PRO:", type="password")
@@ -123,58 +124,48 @@ with st.sidebar:
         st.session_state['db'] = {}
         st.rerun()
 
-# --- 6. MAIN CONTENT ---
-st.title("🎓 SkripsiGen Pro v8.61")
-st.caption("Standard: Academic Formatting (4333, TNR 12, Spasi 1.5)")
+# --- 6. MAIN ---
+st.title("🎓 SkripsiGen Pro v8.62")
+st.caption("Auto-Format: 4-3-3-3 | Font: Times New Roman 12 | Spasi: 1.5")
 
-col1, col2 = st.columns(2)
-with col1:
+c1, c2 = st.columns(2)
+with c1:
     topik = st.text_input("📝 Judul Skripsi:", value=st.session_state['user_data']['topik'])
     st.session_state['user_data']['topik'] = topik
     lokasi = st.text_input("📍 Lokasi:", value=st.session_state['user_data']['lokasi'])
     st.session_state['user_data']['lokasi'] = lokasi
-with col2:
+with c2:
     kota = st.text_input("🏙️ Kota:", value=st.session_state['user_data']['kota'])
     st.session_state['user_data']['kota'] = kota
     metode = st.selectbox("🔬 Metode:", ["Kuantitatif", "Kualitatif", "R&D"])
 
 st.divider()
-pil_bab = st.selectbox("📄 Pilih Bagian:", ["Bab 1", "Bab 2", "Bab 3", "Bab 4", "Bab 5", "Lampiran: Surat Izin, Kuesioner & Kisi-kisi"])
+pil_bab = st.selectbox("📄 Pilih Bagian:", ["Bab 1", "Bab 2", "Bab 3", "Bab 4", "Bab 5", "Lampiran"])
 
-def jalankan_proses(target_bab=None, catatan_dosen=""):
-    bab_aktif = target_bab if target_bab else pil_bab
+if st.button("🚀 Susun & Kalibrasi Sekarang"):
     if topik and nama_user:
-        with st.spinner(f"Menyusun {bab_aktif}..."):
+        with st.spinner("AI sedang meramu skripsi..."):
             try:
                 model = inisialisasi_ai()
                 inst = "Gunakan Anti-Plagiarism & Deep Paraphrase. Ref RIIL 2023-2026, APA 7th."
-                prompt = f"{inst}\nSusun {bab_aktif} skripsi {metode} judul '{topik}' di {lokasi}, {kota}. Revisi: {catatan_dosen}."
+                prompt = f"{inst}\nSusun {pil_bab} skripsi {metode} judul '{topik}' di {lokasi}, {kota}."
                 res = model.generate_content(prompt)
-                st.session_state['db'][bab_aktif] = res.text
-                st.success(f"{bab_aktif} Selesai!")
-            except Exception as e: st.error(f"Gagal: {e}")
-    else: st.warning("Isi Nama & Judul!")
-
-if st.button("🚀 Susun & Kalibrasi Sekarang"):
-    jalankan_proses()
+                st.session_state['db'][pil_bab] = res.text
+                st.rerun()
+            except Exception as e: st.error(f"Error: {e}")
+    else: st.warning("Nama & Judul wajib diisi!")
 
 if st.session_state['db']:
-    st.divider()
-    for b in sorted(st.session_state['db'].keys()):
-        content = st.session_state['db'][b]
+    for b, content in st.session_state['db'].items():
         with st.container(border=True):
             st.markdown(f"### 📄 {b}")
             is_trial, is_pro = b in ["Bab 1", "Bab 2"], user_lic == gen_lic(nama_user)
-            if "Lampiran" not in b:
-                cat = st.text_area(f"✍️ Revisi {b}:", key=f"rev_{b}")
-                if st.button(f"🔄 Jalankan Revisi {b}", key=f"br_{b}"): jalankan_proses(target_bab=b, catatan_dosen=cat)
-            with st.expander(f"Buka Draf {b}"):
+            with st.expander(f"Buka Draf"):
                 st.markdown(content)
                 if is_trial or is_pro:
                     doc_obj = buat_dokumen_rapi(b, content)
-                    bio = BytesIO()
-                    doc_obj.save(bio)
+                    bio = BytesIO(); doc_obj.save(bio)
                     st.download_button(f"📥 Download {b}", data=bio.getvalue(), file_name=f"{b}.docx", key=f"dl_{b}")
                 else:
-                    st.error(f"🔑 {b} Terkunci (Mode PRO)")
+                    st.error("🔑 Terkunci (Mode PRO)")
                     st.link_button("💬 Hubungi Admin", f"https://wa.me/6281273347072?text=Beli%20Lisensi%20{nama_user}")
