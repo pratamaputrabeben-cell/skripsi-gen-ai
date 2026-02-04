@@ -16,7 +16,7 @@ if st.query_params.get("google") == "1":
     st.stop()
 
 # --- 2. CONFIG HALAMAN ---
-st.set_page_config(page_title="SkripsiGen Pro v8.72", page_icon="🎓", layout="wide")
+st.set_page_config(page_title="SkripsiGen Pro v8.73", page_icon="🎓", layout="wide")
 
 # --- 3. SESSION STATE ---
 if 'db' not in st.session_state: st.session_state['db'] = {}
@@ -25,25 +25,34 @@ if 'user_data' not in st.session_state:
         "topik": "", "lokasi": "SMK Negeri 2 Kabupaten Lahat", "kota": "Lahat", "nama": ""
     }
 
-# --- 4. ENGINE SETUP (FIXED NOT FOUND ERROR) ---
+# --- 4. ENGINE SETUP (MODIFIED FOR 404 ERROR) ---
 def inisialisasi_ai():
     try:
         keys = st.secrets.get("GEMINI_API_KEYS", [st.secrets.get("GEMINI_API_KEY", "")])
-        genai.configure(api_key=random.choice(keys))
+        key_aktif = random.choice(keys)
+        genai.configure(api_key=key_aktif)
         
-        # List model yang dicoba satu-satu kalau ada yang 'NotFound'
-        model_targets = ['gemini-1.5-flash', 'gemini-1.5-flash-latest', 'gemini-pro']
+        # Daftar model terbaru 2026 yang paling stabil
+        # Kita pakai versi 'models/' lengkap agar tidak 404
+        model_options = [
+            'gemini-1.5-flash-latest', 
+            'gemini-1.5-pro-latest',
+            'models/gemini-1.5-flash',
+            'models/gemini-1.5-pro'
+        ]
         
-        for m_name in model_targets:
+        for m in model_options:
             try:
-                model = genai.GenerativeModel(m_name)
-                # Tes kecil untuk pastikan modelnya ada
+                model = genai.GenerativeModel(model_name=m)
+                # Tes koneksi ringan
                 return model
             except:
                 continue
-        return genai.GenerativeModel('gemini-1.5-flash') # Last resort
+        
+        # Jika semua gagal, pakai default yang paling umum
+        return genai.GenerativeModel('gemini-pro')
     except Exception as e:
-        st.error(f"Gagal koneksi AI: {e}")
+        st.error(f"Koneksi API Gagal: {e}")
         st.stop()
 
 # --- 5. SIDEBAR & ADMIN ---
@@ -70,8 +79,8 @@ with st.sidebar:
         st.rerun()
 
 # --- 6. TAMPILAN UTAMA ---
-st.title("🎓 SkripsiGen Pro v8.72")
-st.caption("Standard: Academic Formatting 4-3-3-3 | AI Connection Fixed")
+st.title("🎓 SkripsiGen Pro v8.73")
+st.caption("Standard: Academic Formatting 4-3-3-3 | Multi-Model Fallback Active")
 
 c1, c2 = st.columns(2)
 with c1:
@@ -86,15 +95,16 @@ bab = st.selectbox("📄 Pilih Bagian:", ["Bab 1", "Bab 2", "Bab 3", "Bab 4", "B
 
 if st.button("🚀 Susun Sekarang"):
     if st.session_state['user_data']['topik'] and nama_user:
-        with st.spinner("Menyusun..."):
+        with st.spinner("Menghubungi Server Google..."):
             try:
                 model = inisialisasi_ai()
-                prompt = f"Susun {bab} skripsi {metode} judul '{st.session_state['user_data']['topik']}' di {st.session_state['user_data']['lokasi']}, {st.session_state['user_data']['kota']}."
+                prompt = f"Susun {bab} skripsi {metode} judul '{st.session_state['user_data']['topik']}' di {st.session_state['user_data']['lokasi']}, {st.session_state['user_data']['kota']}. Gunakan format akademik."
                 res = model.generate_content(prompt)
-                st.session_state['db'][bab] = res.text
-                st.rerun()
+                if res.text:
+                    st.session_state['db'][bab] = res.text
+                    st.rerun()
             except Exception as e:
-                st.error(f"Terjadi masalah pada server Google: {e}. Silakan coba klik tombol lagi.")
+                st.error(f"Server sibuk: {e}. Coba klik lagi, Bos!")
     else: st.warning("Isi Nama & Judul!")
 
 # --- 7. OUTPUT BOX ---
