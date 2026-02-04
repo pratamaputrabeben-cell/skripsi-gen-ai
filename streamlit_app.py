@@ -4,14 +4,14 @@ from docx import Document
 from io import BytesIO
 from datetime import datetime
 
-# --- 1. KONFIGURASI API (MODEL FLASH - GRATIS & CEPAT) ---
+# --- 1. KONFIGURASI API (MODEL PRO - PASTI ADA) ---
 try:
     api_key = st.secrets["GEMINI_API_KEY"]
     genai.configure(api_key=api_key)
-    # Kita kunci ke model flash agar kuota gratisnya melimpah (15 RPM)
-    model = genai.GenerativeModel("gemini-1.5-flash")
+    # Menggunakan model 'gemini-pro' yang paling stabil di semua versi API
+    model = genai.GenerativeModel('gemini-pro')
 except Exception as e:
-    st.error("Koneksi API Terputus. Cek pengaturan Secrets kamu."); st.stop()
+    st.error("Koneksi API Gagal. Pastikan API Key di Secrets sudah benar."); st.stop()
 
 # --- 2. LOGIKA LISENSI ---
 def gen_lic(n):
@@ -19,12 +19,12 @@ def gen_lic(n):
     nm = n.split(' ')[0].upper() if n else "USER"
     return f"PRO-{nm}-{d}-SKR"
 
-# --- 3. SESSION STATE ---
+# --- 3. DATABASE SESI ---
 if 'db' not in st.session_state: st.session_state['db'] = {}
 if 'pus' not in st.session_state: st.session_state['pus'] = ""
 
 # --- 4. UI SETUP ---
-st.set_page_config(page_title="SkripsiGen Pro v8.13", layout="wide")
+st.set_page_config(page_title="SkripsiGen Pro v8.14", layout="wide")
 
 with st.sidebar:
     st.header("🔓 Aktivasi")
@@ -45,15 +45,15 @@ with st.sidebar:
             pbl = st.text_input("Nama Pembeli:")
             if st.button("Generate ✨"):
                 st.code(gen_lic(pbl))
-                st.info("Berikan kode ini ke pembeli.")
+                st.info("Salin kode di atas untuk pembeli.")
 
 # --- 5. MAIN CONTENT ---
-st.title("🎓 SkripsiGen Pro v8.13")
-st.caption("Mode Stabil: Gratis & Cepat | Standar Akademik 2026")
+st.title("🎓 SkripsiGen Pro v8.14")
+st.caption("Edisi Stabil & Lengkap | Standard Akademik 2026")
 
 c1, c2 = st.columns(2)
 with c1:
-    topik = st.text_input("📝 Judul Skripsi:", placeholder="Contoh: Analisis Kepuasan Pelanggan...")
+    topik = st.text_input("📝 Judul Skripsi:", placeholder="Contoh: Pengaruh Lingkungan Kerja terhadap Produktivitas...")
     lokasi = st.text_input("📍 Lokasi:", placeholder="Contoh: PT. Maju Bersama")
 with c2:
     kota = st.text_input("🏙️ Kota:", placeholder="Contoh: Jakarta")
@@ -64,28 +64,42 @@ pil_bab = st.selectbox("📄 Pilih Bagian:", ["Bab 1", "Bab 2", "Bab 3", "Bab 4"
 
 if st.button("🚀 Susun Draf Skripsi"):
     if topik and nama_user:
-        with st.spinner("Kecerdasan Buatan sedang menyusun draf..."):
-            # Perintah khusus referensi riil
-            prompt = f"Buat draf {pil_bab} skripsi {metode} judul '{topik}' lokasi {lokasi}. Gunakan ahli riil, APA 7th, dan referensi tahun 2023-2026. Akhiri dengan Daftar Pustaka."
+        with st.spinner("AI sedang menyusun draf (Mohon tunggu, jangan klik berulang)..."):
+            # Perintah khusus bedah variabel & referensi riil
+            prompt = f"""
+            Buatkan draf {pil_bab} skripsi {metode} dengan judul '{topik}' di {lokasi}.
+            Instruksi Khusus:
+            1. Bedah variabel dari judul secara mendalam.
+            2. Gunakan referensi riil (ahli terkenal) tahun 2023-2026.
+            3. Ikuti standar APA 7th Edition.
+            4. Gunakan gaya bahasa akademik formal Indonesia.
+            """
             try:
                 res = model.generate_content(prompt).text
                 st.session_state['db'][pil_bab] = res
                 st.rerun()
             except Exception as e:
                 if "429" in str(e):
-                    st.error("⚠️ Server sedang penuh/antre. Mohon tunggu 30-60 detik lalu klik tombol lagi.")
+                    st.error("⚠️ Server Sedang Antre. Mohon tunggu 60 detik lalu klik kembali (Batas Kuota Gratis Google).")
                 else:
-                    st.error(f"Terjadi kendala teknis: {e}")
+                    st.error(f"Kendala: {e}")
     else:
-        st.warning("Silakan isi Nama (di sidebar) dan Judul Skripsi!")
+        st.warning("Silakan lengkapi Nama Mahasiswa dan Judul Skripsi!")
 
 # --- 6. DOKUMEN BOX ---
 if st.session_state['db']:
+    st.divider()
     for b, content in st.session_state['db'].items():
         with st.container(border=True):
-            st.markdown(f"### 📄 {b}")
+            col_b1, col_b2 = st.columns([5, 1])
+            with col_b1:
+                st.markdown(f"### 📄 {b}")
+            with col_b2:
+                if st.button("🗑️ Hapus", key=f"del_{b}"):
+                    del st.session_state['db'][b]; st.rerun()
+            
             st.markdown(content[:300] + "...")
-            with st.expander("Lihat Full & Download"):
+            with st.expander("Lihat & Download"):
                 st.markdown(content)
                 if user_lic == gen_lic(nama_user):
                     doc = Document()
@@ -94,4 +108,4 @@ if st.session_state['db']:
                     bio = BytesIO(); doc.save(bio)
                     st.download_button(f"📥 Download Word ({b})", data=bio.getvalue(), file_name=f"{b}.docx", key=f"d_{b}")
                 else:
-                    st.warning("⚠️ Masukkan kode lisensi di sidebar untuk mendownload file Word.")
+                    st.warning("⚠️ Masukkan kode lisensi di sidebar untuk download file Word.")
