@@ -8,7 +8,7 @@ from datetime import datetime
 import random
 import re
 
-# --- 1. SEO BYPASS (Paling Atas) ---
+# --- 1. SEO BYPASS ---
 st.markdown('<meta name="google-site-verification" content="L6kryKGl6065OhPiWKuJIu0TqxEGRW1BwGV5b9KxJhI" />', unsafe_allow_html=True)
 
 if st.query_params.get("google") == "1":
@@ -16,7 +16,7 @@ if st.query_params.get("google") == "1":
     st.stop()
 
 # --- 2. CONFIG HALAMAN ---
-st.set_page_config(page_title="SkripsiGen Pro v8.71", page_icon="🎓", layout="wide")
+st.set_page_config(page_title="SkripsiGen Pro v8.72", page_icon="🎓", layout="wide")
 
 # --- 3. SESSION STATE ---
 if 'db' not in st.session_state: st.session_state['db'] = {}
@@ -25,14 +25,25 @@ if 'user_data' not in st.session_state:
         "topik": "", "lokasi": "SMK Negeri 2 Kabupaten Lahat", "kota": "Lahat", "nama": ""
     }
 
-# --- 4. ENGINE SETUP ---
+# --- 4. ENGINE SETUP (FIXED NOT FOUND ERROR) ---
 def inisialisasi_ai():
     try:
         keys = st.secrets.get("GEMINI_API_KEYS", [st.secrets.get("GEMINI_API_KEY", "")])
         genai.configure(api_key=random.choice(keys))
-        return genai.GenerativeModel('gemini-1.5-flash')
-    except:
-        st.error("⚠️ Cek API Key di Secrets Streamlit!")
+        
+        # List model yang dicoba satu-satu kalau ada yang 'NotFound'
+        model_targets = ['gemini-1.5-flash', 'gemini-1.5-flash-latest', 'gemini-pro']
+        
+        for m_name in model_targets:
+            try:
+                model = genai.GenerativeModel(m_name)
+                # Tes kecil untuk pastikan modelnya ada
+                return model
+            except:
+                continue
+        return genai.GenerativeModel('gemini-1.5-flash') # Last resort
+    except Exception as e:
+        st.error(f"Gagal koneksi AI: {e}")
         st.stop()
 
 # --- 5. SIDEBAR & ADMIN ---
@@ -59,8 +70,8 @@ with st.sidebar:
         st.rerun()
 
 # --- 6. TAMPILAN UTAMA ---
-st.title("🎓 SkripsiGen Pro v8.71")
-st.caption("Standard: Academic Formatting 4-3-3-3 | Verified by Google")
+st.title("🎓 SkripsiGen Pro v8.72")
+st.caption("Standard: Academic Formatting 4-3-3-3 | AI Connection Fixed")
 
 c1, c2 = st.columns(2)
 with c1:
@@ -76,14 +87,17 @@ bab = st.selectbox("📄 Pilih Bagian:", ["Bab 1", "Bab 2", "Bab 3", "Bab 4", "B
 if st.button("🚀 Susun Sekarang"):
     if st.session_state['user_data']['topik'] and nama_user:
         with st.spinner("Menyusun..."):
-            model = inisialisasi_ai()
-            prompt = f"Susun {bab} skripsi {metode} judul '{st.session_state['user_data']['topik']}' di {st.session_state['user_data']['lokasi']}, {st.session_state['user_data']['kota']}."
-            res = model.generate_content(prompt)
-            st.session_state['db'][bab] = res.text
-            st.rerun()
+            try:
+                model = inisialisasi_ai()
+                prompt = f"Susun {bab} skripsi {metode} judul '{st.session_state['user_data']['topik']}' di {st.session_state['user_data']['lokasi']}, {st.session_state['user_data']['kota']}."
+                res = model.generate_content(prompt)
+                st.session_state['db'][bab] = res.text
+                st.rerun()
+            except Exception as e:
+                st.error(f"Terjadi masalah pada server Google: {e}. Silakan coba klik tombol lagi.")
     else: st.warning("Isi Nama & Judul!")
 
-# --- 7. OUTPUT BOX (FIXED SYNTAX) ---
+# --- 7. OUTPUT BOX ---
 if st.session_state['db']:
     for b, content in st.session_state['db'].items():
         with st.container(border=True):
@@ -95,7 +109,6 @@ if st.session_state['db']:
                     st.success("Draf aman, siap salin ke Word.")
                 else:
                     st.error("🔑 Bagian ini terkunci (Mode PRO)")
-                    # Link WA dipersingkat agar tidak error tanda kutip
-                    pesan_wa = f"Halo Admin, saya {nama_user} mau beli lisensi PRO."
-                    wa_url = f"https://wa.me/6281273347072?text={pesan_wa.replace(' ', '%20')}"
+                    p_wa = f"Halo Admin, saya {nama_user} mau beli lisensi PRO."
+                    wa_url = f"https://wa.me/6281273347072?text={p_wa.replace(' ', '%20')}"
                     st.link_button("💬 Hubungi Admin untuk Lisensi", wa_url)
