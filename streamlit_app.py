@@ -32,106 +32,61 @@ if 'pustaka_koleksi' not in st.session_state:
     st.session_state['pustaka_koleksi'] = ""
 
 # --- 4. TAMPILAN DASHBOARD ---
-st.set_page_config(page_title="SkripsiGen Pro v8.8", layout="wide")
+st.set_page_config(page_title="SkripsiGen Pro v8.9", layout="wide")
 
+# --- SIDEBAR (AKTIVASI & ADMIN) ---
 with st.sidebar:
     st.header("🔓 Aktivasi & Verifikasi")
     nama_user = st.text_input("👤 Nama Mahasiswa:", placeholder="Budi Santoso")
     user_license = st.text_input("🔑 Kode Lisensi:", type="password")
     
     st.divider()
-    st.write("🔍 **Pusat Verifikasi Dokumen**")
-    st.caption("Salin judul referensi/DOI dari draf untuk dicek keasliannya:")
-    cek_judul = st.text_input("Judul/DOI:", placeholder="Contoh: 10.1038/s41586-020-2012-7")
-    
+    st.write("🔍 **Cek Keaslian Jurnal**")
+    cek_judul = st.text_input("Judul/DOI:", placeholder="Salin judul ke sini...")
     if cek_judul:
         q = cek_judul.replace(' ', '+')
-        c1, c2 = st.columns(2)
-        with c1:
-            st.link_button("Google Scholar", f"https://scholar.google.com/scholar?q={q}")
-            st.link_button("Crossref (DOI)", f"https://search.crossref.org/?q={q}")
-        with c2:
-            st.link_button("DOAJ (Jurnal)", f"https://doaj.org/search/articles?source=%7B%22query%22%3A%7B%22query_string%22%3A%7B%22query%22%3A%22{q}%22%7D%7D%7D")
-            st.link_button("PubMed/ResGate", f"https://www.ncbi.nlm.nih.gov/pubmed/?term={q}")
+        st.link_button("Cek di Google Scholar ↗️", f"https://scholar.google.com/scholar?q={q}")
 
     st.divider()
-    if st.button("🗑️ Hapus Semua Progress"):
+    if st.button("🗑️ Reset Semua Data"):
         st.session_state['db'] = {}
         st.session_state['pustaka_koleksi'] = ""
         st.rerun()
-    
-    st.link_button("📲 Beli Lisensi (WA)", "https://wa.me/6283173826717")
 
-st.title("🎓 SkripsiGen Pro v8.8")
-st.caption("Referensi Terintegrasi: Google Scholar, Crossref, DOAJ, PubMed, & ResearchGate")
+    # --- TEMPAT GENERATE LISENSI (DI SINI BOS!) ---
+    st.divider()
+    with st.expander("🛠️ MENU OWNER (GENERATE KODE)"):
+        kunci_admin = st.text_input("Password Admin:", type="password")
+        if kunci_admin == "BEBEN-BOSS":
+            st.subheader("Buat Lisensi Baru")
+            nama_pembeli = st.text_input("Nama Pembeli:")
+            if st.button("Generate Sekarang ✨"):
+                kode_baru = generate_license_logic(nama_pembeli)
+                st.code(kode_baru)
+                st.success(f"Salin kode di atas untuk {nama_pembeli}")
+        else:
+            st.info("Masukkan password 'BEBEN-BOSS' untuk buka generator.")
 
-# --- 5. INPUT DATA ---
+# --- 5. TAMPILAN UTAMA ---
+st.title("🎓 SkripsiGen Pro v8.9")
+st.caption("Sistem Pengerjaan Skripsi Otomatis - Standar Akademik 2026")
+
 c1, c2 = st.columns(2)
 with c1:
     topik = st.text_input("📝 Judul Skripsi:", placeholder="Analisis Pengaruh...")
-    lokasi = st.text_input("📍 Lokasi Penelitian:", placeholder="Contoh: RSUD Dr. Soetomo / PT. Telkom")
+    lokasi = st.text_input("📍 Lokasi Penelitian:", placeholder="Contoh: PT. Maju Jaya")
 with c2:
-    kota = st.text_input("🏙️ Kota & Provinsi:", placeholder="Surabaya, Jawa Timur")
+    kota = st.text_input("🏙️ Kota & Provinsi:", placeholder="Contoh: Jakarta Selatan, DKI Jakarta")
     metode = st.selectbox("🔬 Metode Penelitian:", ["Kuantitatif", "Kualitatif", "R&D"])
 
 st.divider()
 
-# --- 6. FORM GENERATOR ---
+# GENERATOR
 bab_pilihan = st.selectbox("📄 Pilih Bagian pengerjaan:", 
                           ["Bab 1: Pendahuluan", "Bab 2: Tinjauan Pustaka", "Bab 3: Metodologi Penelitian", 
                            "Bab 4: Hasil dan Pembahasan", "Bab 5: Penutup", "Lampiran: Instrumen"])
 
 if st.button("🚀 Generate Draf Akademik"):
     if topik and nama_user:
-        with st.spinner("Sinkronisasi database referensi..."):
-            thn = 2026
-            rentang = f"{thn-3}-{thn}"
-            
-            # --- PROMPT DATABASE INTEGRATED ---
-            prompt = f"""
-            Buatkan draf {bab_pilihan} skripsi {metode} judul '{topik}' di {lokasi}.
-            
-            ATURAN REFERENSI KETAT:
-            1. Gunakan literatur yang memiliki pola data RIIL dari Crossref, DOAJ, PubMed, atau ResearchGate.
-            2. WAJIB sertakan minimal 5 referensi terbaru tahun {rentang}.
-            3. Gunakan tokoh ahli utama di bidang terkait (Misal: Sugiyono, Kotler, Arikunto, atau pakar internasional PubMed).
-            4. Untuk Bab 2: Bedah variabel judul satu per satu secara mendalam.
-            5. Gunakan Sitasi APA 7th Edition dan Daftar Pustaka kumulatif: {st.session_state['pustaka_koleksi']}.
-            """
-            
-            try:
-                res = model.generate_content(prompt).text
-                st.session_state['db'][bab_pilihan] = res
-                if "DAFTAR PUSTAKA" in res.upper():
-                    st.session_state['pustaka_koleksi'] += "\n" + res.upper().split("DAFTAR PUSTAKA")[-1]
-                st.rerun()
-            except Exception as e: st.error(f"Gagal: {e}")
-    else: st.warning("Nama (sidebar) dan Judul wajib diisi!")
-
-# --- 7. BOX MANAGEMENT ---
-st.divider()
-if not st.session_state['db']:
-    st.info("Dokumen akan muncul di sini setelah di-generate.")
-else:
-    for bab, isi in st.session_state['db'].items():
-        with st.container(border=True):
-            ch1, ch2 = st.columns([5, 1])
-            with ch1: st.markdown(f"### 📄 {bab}")
-            with ch2:
-                if st.button("🗑️ Hapus", key=f"del_{bab}"):
-                    del st.session_state['db'][bab]
-                    st.rerun()
-            
-            st.markdown(isi[:300] + "...")
-            with st.expander("Baca & Download"):
-                st.markdown(isi)
-                st.divider()
-                if user_license == generate_license_logic(nama_user):
-                    doc = Document()
-                    doc.add_heading(bab, 0)
-                    doc.add_paragraph(isi)
-                    bio = BytesIO()
-                    doc.save(bio)
-                    st.download_button(f"📥 Download (.docx)", data=bio.getvalue(), file_name=f"{bab}.docx", key=f"dl_{bab}")
-                else:
-                    st.warning("Masukkan kode lisensi di sidebar untuk download.")
+        with st.spinner("Menghubungkan ke database referensi..."):
+            thn =
