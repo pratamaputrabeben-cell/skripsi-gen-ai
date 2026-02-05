@@ -150,7 +150,7 @@ def jalankan_proses(target_bab=None, catatan_dosen=""):
         with st.spinner(f"Menyusun & Kalibrasi {bab_aktif}..."):
             try:
                 model = inisialisasi_ai()
-                inst = "Gunakan Anti-Plagiarism & Deep Paraphrase. Referensi RIIL 2023-2026, APA 7th. Masukkan DAFTAR PUSTAKA di akhir draf jika relevan."
+                inst = "Gunakan Anti-Plagiarism & Deep Paraphrase. Referensi RIIL 2018-2026, APA 7th. Masukkan DAFTAR PUSTAKA di akhir draf jika relevan."
                 prompt = f"{inst}\nSusun {bab_aktif} skripsi {metode} judul '{topik}' di {lokasi}, {kota}. Revisi: {catatan_dosen}."
                 res = model.generate_content(prompt)
                 st.session_state['db'][bab_aktif] = res.text
