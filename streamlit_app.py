@@ -23,7 +23,7 @@ if 'db' not in st.session_state: st.session_state['db'] = {}
 if 'user_data' not in st.session_state:
     st.session_state['user_data'] = {"topik": "", "lokasi": "SMK Negeri 2 Kabupaten Lahat", "kota": "Lahat", "nama": ""}
 
-# --- 2. FUNGSI WORD (4333) ---
+# --- 2. FUNGSI RAPIKAN WORD (4333) ---
 def buat_dokumen_rapi(judul_bab, isi_teks):
     doc = Document()
     for sec in doc.sections:
@@ -52,17 +52,26 @@ def buat_dokumen_rapi(judul_bab, isi_teks):
     return bio.getvalue()
 
 # --- 3. UI SIDEBAR ---
-st.set_page_config(page_title="SkripsiGen Pro v8.59", layout="wide")
+st.set_page_config(page_title="SkripsiGen Pro v8.51", layout="wide", page_icon="🎓")
+
 with st.sidebar:
     st.header("🛡️ Pusat Kalibrasi")
     st.session_state['user_data']['nama'] = st.text_input("👤 Nama Mahasiswa:", value=st.session_state['user_data']['nama'])
     user_lic = st.text_input("🔑 Kode Lisensi PRO:", type="password")
+    
     def gen_lic(n):
         nm = n.split(' ')[0].upper() if n else "USER"
         return f"PRO-{nm}-{datetime.now().strftime('%d%m')}-SKR"
+
     st.divider()
-    st.markdown("### 🛠️ PANEL ADMIN")
-    pw = st.text_input("Password Admin:", type="password")
-    if pw == "RAHASIA-BEBEN-2026":
-        pbl = st.text_input("Nama Pembeli Baru:")
-        if st.button("Generate License"): st.code(gen_lic(pbl))
+    with st.expander("🛠️ OWNER PANEL"):
+        pw = st.text_input("Admin Password:", type="password")
+        if pw == "RAHASIA-BEBEN-2026":
+            st.info("Halo Bos Beben!")
+            pbl = st.text_input("Nama Pembeli:")
+            if st.button("Generate License ✨"):
+                st.code(gen_lic(pbl))
+    
+    if st.button("🗑️ Reset & Hapus Semua"):
+        st.session_state['db'] = {}
+        st
