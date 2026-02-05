@@ -12,32 +12,26 @@ import time
 # --- 1. KONFIGURASI ENGINE ---
 def inisialisasi_ai():
     keys = st.secrets.get("GEMINI_API_KEYS", [])
-    if not keys:
-        keys = [st.secrets.get("GEMINI_API_KEY", "")]
-    key_aktif = random.choice(keys)
-    genai.configure(api_key=key_aktif)
+    if not keys: keys = [st.secrets.get("GEMINI_API_KEY", "")]
+    genai.configure(api_key=random.choice(keys))
     return genai.GenerativeModel('gemini-1.5-flash')
 
 if 'db' not in st.session_state: st.session_state['db'] = {}
 if 'user_data' not in st.session_state:
     st.session_state['user_data'] = {"topik": "", "lokasi": "SMK Negeri 2 Kabupaten Lahat", "kota": "Lahat", "nama": ""}
 
-# --- FUNGSI AUTO-RETRY (BIAR GAK SIBUK) ---
+# --- FUNGSI AUTO-RETRY ---
 def eksekusi_ai_kebal(prompt):
-    max_retries = 3
-    for i in range(max_retries):
+    for i in range(3):
         try:
             model = inisialisasi_ai()
             res = model.generate_content(prompt)
             return res.text
-        except Exception as e:
-            if i < max_retries - 1:
-                time.sleep(2)
-                continue
-            else:
-                raise e
+        except:
+            if i < 2: time.sleep(2); continue
+            else: raise Exception("Server Sibuk")
 
-# --- 2. FUNGSI PEMBANTU (BACA & BUAT WORD) ---
+# --- 2. FUNGSI WORD ---
 def baca_file_word(file_upload):
     doc = Document(file_upload)
     return "\n".join([para.text for para in doc.paragraphs])
@@ -48,15 +42,10 @@ def buat_dokumen_rapi(judul_bab, isi_teks):
         sec.left_margin, sec.top_margin, sec.right_margin, sec.bottom_margin = Cm(4), Cm(3), Cm(3), Cm(3)
     style = doc.styles['Normal']
     style.font.name, style.font.size = 'Times New Roman', Pt(12)
-    
-    # Bersihkan Teks
-    t_clean = re.sub(r"^(Tentu|Berikut|Ini adalah|Sesuai).*?\n", "", isi_teks, flags=re.IGNORECASE)
-    t_clean = t_clean.replace("**", "").replace("---", "")
-
+    t_clean = re.sub(r"^(Tentu|Berikut|Ini adalah|Sesuai).*?\n", "", isi_teks, flags=re.IGNORECASE).replace("**", "").replace("---", "")
     head = doc.add_heading(judul_bab.upper(), 0)
     head.alignment = WD_ALIGN_PARAGRAPH.CENTER
     for run in head.runs: run.font.name, run.font.size, run.bold = 'Times New Roman', Pt(14), True
-
     for p_text in t_clean.split('\n'):
         if p_text.strip():
             p = doc.add_paragraph()
@@ -69,7 +58,7 @@ def buat_dokumen_rapi(judul_bab, isi_teks):
     bio = BytesIO(); doc.save(bio); return bio.getvalue()
 
 # --- 3. UI SIDEBAR ---
-st.set_page_config(page_title="SkripsiGen Pro v8.61", layout="wide")
+st.set_page_config(page_title="SkripsiGen Pro v8.62", layout="wide")
 with st.sidebar:
     st.header("🛡️ Pusat Kalibrasi")
     st.session_state['user_data']['nama'] = st.text_input("👤 Nama Mahasiswa:", value=st.session_state['user_data']['nama'])
@@ -87,11 +76,11 @@ with st.sidebar:
         st.session_state['db'] = {}; st.rerun()
 
 # --- 4. TAMPILAN UTAMA ---
-st.title("🎓 SkripsiGen Pro v8.61")
+st.title("🎓 SkripsiGen Pro v8.62")
 st.caption("Standard: 4333 | Fitur: Auto-Retry & Word Deep Analysis")
 
-with st.expander("📤 UPLOAD FILE WORD (Opsional)", expanded=False):
-    up_file = st.file_uploader("Upload draf lama mahasiswa", type=["docx"])
+with st.expander("📤 UPLOAD FILE WORD (Opsional)"):
+    up_file = st.file_uploader("Upload draf lama", type=["docx"])
     if up_file:
         st.session_state['db']['File_Upload'] = baca_file_word(up_file)
         st.success("✅ File berhasil dibaca!")
@@ -110,31 +99,17 @@ pil_bab = st.selectbox("📄 Pilih Bab:", ["Bab 1", "Bab 2", "Bab 3", "Bab 4", "
 
 if st.button("🚀 Proses & Kalibrasi Sekarang"):
     if st.session_state['user_data']['topik'] and st.session_state['user_data']['nama']:
-        with st.spinner("Menyusun draf... (Auto-Retry Aktif)"):
+        with st.spinner("Menyusun draf..."):
             try:
                 k_lama = st.session_state['db'].get('File_Upload', "Tidak ada.")
-                prmt = f"Susun {pil_bab}. Judul: {st.session_state['user_data']['topik']}. Lokasi: {st.session_state['user_data']['lokasi']}. Metode: {metode}. Draf asal: {k_lama}"
-                hasil = eksekusi_ai_kebal(prmt)
-                st.session_state['db'][pil_bab] = hasil
+                jdl = st.session_state['user_data']['topik']
+                lks = st.session_state['user_data']['lokasi']
+                prmt = f"Susun {pil_bab}. Judul: {jdl}. Lokasi: {lks}. Draf asal: {k_lama}"
+                st.session_state['db'][pil_bab] = eksekusi_ai_kebal(prmt)
                 st.rerun()
-            except: st.error("Server sibuk banget. Coba lagi 10 detik lagi ya!")
+            except: st.error("Server sibuk banget. Klik lagi Bos!")
     else: st.warning("Nama & Judul wajib diisi!")
 
-# --- 5. BOX OUTPUT (DENGAN REVISI) ---
+# --- 5. BOX OUTPUT ---
 if st.session_state['db']:
     st.divider()
-    for b in sorted(st.session_state['db'].keys()):
-        if b == "File_Upload": continue
-        with st.container(border=True):
-            st.markdown(f"### 📄 {b}")
-            ocehan = st.text_area(f"📢 Ocehan Dosen {b}:", key=f"rev_{b}")
-            if st.button(f"🔄 Jalankan Revisi {b}", key=f"btn_{b}"):
-                with st.spinner("Memperbaiki sesuai ocehan..."):
-                    p_rev = f"Draf: {st.session_state['db'][b]}. Revisi Dosen: {ocehan}. Perbaiki."
-                    st.session_state['db'][b] = eksekusi_ai_kebal(p_rev)
-                    st.rerun()
-            with st.expander("Buka Draf"):
-                st.markdown(st.session_state['db'][b])
-                is_pro = user_lic == gen_lic(st.session_state['user_data']['nama'])
-                if b in ["Bab 1", "Bab 2"] or is_pro:
-                    data_word = buat_dokumen_rapi(b, st.session_state['db']
