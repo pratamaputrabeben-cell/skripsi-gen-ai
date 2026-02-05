@@ -52,7 +52,7 @@ def buat_dokumen_rapi(judul_bab, isi_teks):
     return bio.getvalue()
 
 # --- 3. UI SIDEBAR ---
-st.set_page_config(page_title="SkripsiGen Pro v8.58", layout="wide")
+st.set_page_config(page_title="SkripsiGen Pro v8.59", layout="wide")
 with st.sidebar:
     st.header("🛡️ Pusat Kalibrasi")
     st.session_state['user_data']['nama'] = st.text_input("👤 Nama Mahasiswa:", value=st.session_state['user_data']['nama'])
@@ -66,16 +66,3 @@ with st.sidebar:
     if pw == "RAHASIA-BEBEN-2026":
         pbl = st.text_input("Nama Pembeli Baru:")
         if st.button("Generate License"): st.code(gen_lic(pbl))
-    if st.button("🗑️ Reset Semua"):
-        st.session_state['db'] = {}
-        st.rerun()
-
-# --- 4. TAMPILAN UTAMA ---
-st.title("🎓 SkripsiGen Pro v8.58")
-st.caption("Fix Syntax Error | Stable Version")
-c1, c2 = st.columns(2)
-with c1:
-    st.session_state['user_data']['topik'] = st.text_input("📝 Judul:", value=st.session_state['user_data']['topik'])
-    st.session_state['user_data']['lokasi'] = st.text_input("📍 Lokasi:", value=st.session_state['user_data']['lokasi'])
-with c2:
-    st.session_state['user_data']['kota'] = st.text_input("🏙️ Kota:", value=st.session_state['user_data']['kota'])
