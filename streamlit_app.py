@@ -144,15 +144,23 @@ with col2:
 st.divider()
 pil_bab = st.selectbox("📄 Pilih Bagian:", ["Bab 1", "Bab 2", "Bab 3", "Bab 4", "Bab 5", "Lampiran: Surat Izin, Kuesioner & Kisi-kisi"])
 
+# --- UPDATE DI BAGIAN LOGIKA PROSES ---
 def jalankan_proses(target_bab=None, catatan_dosen=""):
     bab_aktif = target_bab if target_bab else pil_bab
     if topik and nama_user:
         with st.spinner(f"Menyusun & Kalibrasi {bab_aktif}..."):
             try:
                 model = inisialisasi_ai()
-                inst = "Gunakan Anti-Plagiarism & Deep Paraphrase. Referensi RIIL 2018-2026, APA 7th. Masukkan DAFTAR PUSTAKA di akhir draf jika relevan."
+                # Mantra khusus biar AI buatin kuesioner riil di Lampiran
+                if "Lampiran" in bab_aktif:
+                    inst = "Buatkan kuesioner penelitian Skala Likert (4 atau 5 pilihan) yang SANGAT DETAIL."
+                else:
+                    inst = "Gunakan Anti-Plagiarism & Deep Paraphrase. Referensi RIIL 2018-2026, APA 7th."
+                
                 prompt = f"{inst}\nSusun {bab_aktif} skripsi {metode} judul '{topik}' di {lokasi}, {kota}. Revisi: {catatan_dosen}."
                 res = model.generate_content(prompt)
+                
+                # Simpan ke session state
                 st.session_state['db'][bab_aktif] = res.text
                 st.success(f"{bab_aktif} Berhasil Disusun!")
                 st.rerun()
