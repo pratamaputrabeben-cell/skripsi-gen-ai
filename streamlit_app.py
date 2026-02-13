@@ -176,7 +176,7 @@ if st.session_state['db']:
                 if st.button(f"🔄 Jalankan Revisi {b}", key=f"br_{b}"): jalankan_proses(target_bab=b, catatan_dosen=cat)
             
             with st.expander(f"Buka Draf {b}"):
-                st.markdown(content)
+                st.text_area("Konten Draf:", value=content, height=400, disabled=True)
                 if is_trial or is_pro:
                     data_word = buat_dokumen_rapi(b, content)
                     st.download_button(f"📥 Download {b} (Word Rapi)", data=data_word, file_name=f"{b}.docx", key=f"dl_{b}")
