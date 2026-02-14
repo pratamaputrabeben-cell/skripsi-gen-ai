@@ -19,7 +19,7 @@ def inisialisasi_ai():
     genai.configure(api_key=key_aktif)
     try:
         available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-        for target in ['gemini-1.5-flash', 'gemini-1.5-pro']:
+        for target in ['gemini-2.5-flash', 'gemini-1.5-pro']:
             for real_model in available_models:
                 if target in real_model: return genai.GenerativeModel(real_model)
         return genai.GenerativeModel(available_models[0])
